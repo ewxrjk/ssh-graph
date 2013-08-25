@@ -614,7 +614,8 @@ for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %trusts
             if($keyid2 ne $keyid
                and exists $trusts{$keyid2}->{$host}
                and intersects($has{$keyid}, $has{$keyid2})) {
-                print STDERR "$host:\n  $info{$keyid}->{name}\n  $info{$keyid2}->{name}\n";
+                print STDERR "WARNING: $host can be reached from both $info{$keyid}->{name} and $info{$keyid2}->{name}\n"
+                    if $info{$keyid}->{serial} < $info{$keyid2}->{serial};
                 $color = "green";
                 last;
             }
