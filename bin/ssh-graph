@@ -1,0 +1,615 @@
+#! /usr/bin/perl -w
+#
+# Copyright © 2013 Richard Kettlewell
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+use warnings;
+use POSIX;
+use MIME::Base64;
+
+=head1 NAME
+
+ssh-graph - Graph SSH key distribution and check for anomalies
+
+=head1 SYNOPSIS
+
+B<ssh-graph> [I<OPTIONS>] [B<-->] [I<USER>B<@>]I<HOST> ...
+
+=head1 DESCRIPTION
+
+B<ssh-graph> generates a Graphviz source file showing the relationship
+between keys and hosts, and prints warnings about anything it doesn't
+like.
+
+It must be able to access the host listed on the command line via SSH.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--no-local>
+
+Suppresses access to the local host's I<.ssh> directory.
+
+=item B<--local> I<NAME>
+
+Enables access to the local host's I<.ssh> directory (which is the
+default) and sets its name.
+(By default the local node name is used.)
+
+=item B<--strip> I<SUFFIX>
+
+Specifies a suffix to strip from key names.
+
+=item B<--strength> I<BITS>
+
+The minimum security strength for a key not to be considered weak.
+The default is 112.
+
+=item B<--verbose>
+
+Print progress messages to standard error.
+
+=item B<--help>
+
+Display a usage message.
+
+=item B<--version>
+
+Display the version string.
+
+=back
+
+=head1 OUTPUT
+
+The output is an input file for Graphviz.
+
+=head2 Keys
+
+Each key is shown as a box.  The first row is the name of the key, the
+second the key type and the third an approximation to the key size in
+bits.
+
+If the box is red then that means the key is weak (as defined by the
+B<--strength> options).
+
+If the box filled in red then not only is the key weak but it can
+access some host.  It is recommended that you correct any such
+situations.
+
+If the box is grey then that means it can access no (known) host.
+(The test for weakness overrides this check.)  Such keys may be
+candidates for deletion, though they may be used by some host not
+listed.
+
+If the text is green then that means this key has more than one name.
+This isn't necessarily a problem but is very confusing.
+
+If the text is blue then that means this key shares it's name with at
+least one other key.  This isn't necessarily a problem but is very
+confusing.
+
+=head2 Hosts
+
+Each host is shown in an ellipse.
+
+Inbound edges indicate keys that can access the host.  If they are
+red, that means the key is weak.
+
+Outbound edges to a key mean that the host has the private half of
+that key.
+
+If outbound edges are blue, that means more than one host has this
+private key.  While there may be a good reason for this, it may also
+be a problem that should be corrected.
+
+If outbound edges are green, that means that the destination host can
+be reached from a single source host using more than one key.  This is
+probably a problem that should be corrected.
+
+=head1 NOTES
+
+=head2 Security Strengths
+
+Security strengths are based on NIST recommendations in SP800-57 part
+1 revision 3.
+
+If you think 1024-bit RSA/DSA is good enough then you should request
+a security strength of 80.
+
+The default security strength of 112 corresponds to 2048-bit RSA/DSA
+keys and 224-bit ECC keys.  This value may be raised in future
+versions.
+
+=head2 SSH Protocol Version 1
+
+SSH protocol version 1 s considered broken and keys for it are
+assigned a security strength of 0, regardless of key size.
+
+=head2 Identifying Keys
+
+Private keys are identified by looking for public keys in I<.ssh>
+directory and assuming that any appropriately named file must be a
+copy of the corresponding private key.
+
+=head1 BUGS
+
+B<ssh-graph> can only include I<authorized_keys> files that it can
+reach directly via SSH.  It should be able to make multiple SSH hops.
+
+It should be possible to supply key control and trust information
+collected 'offline'.
+
+The data collection phase should be parallelizable.
+
+The SSH config file should be read, to locate keys mentioned in
+B<IdentityFile> directives.
+
+OpenPGP keys are not yet supported.
+
+=head1 SEE ALSO
+
+B<ssh>(1), B<dot>(1)
+
+=cut
+
+our $VERSION = '0.1';
+
+our %has = ();          # HOST a copy of KEYID's privkey if has{KEYID}->{HOST}
+our %trusts = ();       # HOST trusts KEYID if trusts{KEYID}->{HOST}
+our %info = ();         # metadata abot KEYID: info{KEYID}->{...}
+
+our $verbose = 0;       # --verbose option
+our $local = 1;         # consult local ~/.ssh
+our $localName;         # name for local ~/.ssh
+our @ak = ("authorized_keys", "authorized_keys2");
+our $keySerial = 0;     # counter for key serial number
+our $strip;             # suffix to strip from key names
+our $minStrength = 112; # minimum security strength
+
+sub privkey($) {
+    local $_ = shift;
+    if(/(.*)\.pub/) {
+        return $1;
+    } else {
+        return undef;
+    }
+}
+
+sub readLocalFile($) {
+    my $path = shift;
+    open(FILE, "<", $path) or die "ERROR: $path: $!\n";
+    my @contents = <FILE>;
+    close FILE;
+    return @contents;
+}
+
+sub remoteCommand($$) {
+    my ($host, $cmd) = @_;
+    open(CMD, "-|", "ssh -x $host \Q$cmd\E")
+        or die "ERROR: ssh $host: $!\n";
+    my @contents = <CMD>;
+    (close CMD) or die "ERROR: ssh $host: $!/$?\n";
+    chomp @contents;
+    return @contents;
+}
+
+sub readRemoteFile($$) {
+    my ($host, $file) = @_;
+    return remoteCommand($host, "cat $file");
+}
+
+sub listRemoteFiles($$) {
+    my ($host, $pattern) = @_;
+    return remoteCommand($host, "ls -1 $pattern || true");
+}
+
+sub remoteFileExists($$) {
+    my ($host, $file) = @_;
+    return !system("ssh -x $host test -e \Q$file\E");
+}
+
+sub parseKey($$$) {
+    my ($host, $line, $what) = @_;
+    my $keyid;
+    my $strength;
+    my $type;
+    my $protocol;
+    my $name;
+    my $bits;
+    if($line =~ /^(\d+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+(.*)$/i) {
+        # 1: bits exponent modulus comment
+        $type = "rsa";
+        $strength = $1;
+        $keyid = "$2-$3";
+        $protocol = 1;
+        $name = $4;
+        $bits = $1;
+        $strength = 0;          # protocol assumed to inherently broken
+    } elsif($line =~ /^([a-z0-9\-]+)\s+([0-9a-z\+\/=]+)\s+(.*)$/i) {
+        # 2: type keydata comment
+        $type = $1;
+        $keyid = $2;
+        $protocol = 2;
+        $name = $3;
+        ($strength, $bits) = keyStrength($2);
+    } else {
+        die "ERROR: $host has incomprehensible $what $line\n";
+    }
+    $info{$keyid}->{strength} = $strength if defined $strength;
+    $info{$keyid}->{bits} = $bits if defined $bits;
+    $info{$keyid}->{type} = $type if defined $type;
+    $info{$keyid}->{protocol} = $protocol if defined $protocol;
+    if(defined $name) {
+        if(exists $info{$keyid}->{name}
+           and $name ne $info{$keyid}->{name}) {
+            print STDERR "WARNING: key $info{$keyid}->{name} is also called $name\n";
+            $info{$keyid}->{multinamed} = 1;
+        } else {
+            $info{$keyid}->{name} = $name;
+        }
+    }
+    $info{$keyid}->{serial} = $keySerial++ unless exists $info{$keyid}->{serial};
+    return $keyid;
+}
+
+sub hasKey($@) {
+    my ($host, @key) = @_;
+    for my $line (@key) {
+        my $keyid = parseKey($host, $line, "pubkey");
+        $has{$keyid}->{$host} = 1;
+    }
+}
+
+sub trustsKeys($@) {
+    my ($host, @keys) = @_;
+    for my $line (@keys) {
+        next if $line =~ /^(#.*|\s*)$/;
+        my $keyid = parseKey($host, $line, "key");
+        $trusts{$keyid}->{$host} = 1;
+        # TODO cope with conflicts
+    }
+}
+
+sub keyName($) {
+    my $keyid = shift;
+    my $name = ($info{$keyid}->{name} or $keyid);
+    $name =~ s/\Q$strip\E$//;
+    return $name;
+}
+
+sub keyLabel($) {
+    my $keyid = shift;
+    return "k$info{$keyid}->{serial}";
+}
+
+# Returns (strength, bits)
+# http://csrc.nist.gov/publications/nistpubs/800-57/sp800-57_part1_rev3_general.pdf
+sub keyStrength($) {
+    my $decoded = decode_base64($_[0]);
+    # Data type representations:
+    #    http://tools.ietf.org/html/rfc4251#section-5
+    my $type = unpack("l>/a", $decoded);
+    if($type eq 'ssh-rsa') {
+        # RSA key format:
+        #    http://tools.ietf.org/html/rfc4253#section-6.6
+        my ($type, $e, $n) = unpack("l>/a l>/a l>/a", $decoded);
+        $n =~ s/^\0*//;
+        my $bits = 8 * length($n);
+        if($bits < 1024) {
+            return (0, $bits);
+        } elsif($bits < 2048) {
+            return (80, $bits);
+        } elsif($bits < 3072) {
+            return (112, $bits);
+        } elsif($bits < 7680) {
+            return (128, $bits);
+        } elsif($bits < 15360) {
+            return (192, $bits);
+        } else {
+            return (256, $bits);
+        }
+    } elsif($type eq 'ssh-dss') {
+        # DSA key format:
+        #    http://tools.ietf.org/html/rfc4253#section-6.6
+        my ($type, $p, $q, $g, $y) = unpack("l>/a l>/a l>/a l>/a l>/a",
+                                            $decoded);
+        $p =~ s/^\0*//;
+        $q =~ s/^\0*//;
+        my $lbits = 8 * length($p);
+        my $nbits = 8 * length($q);
+        if($lbits < 1024 or $nbits < 160) {
+            return (0, $lbits)
+        } elsif($lbits < 2048 or $nbits < 224) {
+            return (80, $lbits);
+        } elsif($lbits < 3072 or $nbits < 256) {
+            return (112, $lbits);
+        } elsif($lbits < 7680 or $nbits < 384) {
+            return (128, $lbits);
+        } elsif($lbits < 15360 or $nbits < 512) {
+            return (192, $lbits);
+        } else {
+            return (256, $lbits);
+        }
+    } elsif($type =~ /^ecdsa-/) {
+        my ($type, $domain, $q) = unpack("l>/a l>/a l>/a", $decoded);
+        # Key format:
+        #    http://tools.ietf.org/html/rfc5656#section-3.1
+        # Domain parameter IDs:
+        #    http://tools.ietf.org/html/rfc5656#section-10
+        # NIST recommended curves:
+        #    http://csrc.nist.gov/groups/ST/toolkit/documents/dss/NISTReCur.pdf
+        if($domain eq '1.2.840.10045.3.1.1') { # nistp192
+            return (80, 192);
+        } elsif($domain eq '1.3.132.0.33') { # nistp224
+            return (112, 224);
+        } elsif($domain eq 'nistp256') {
+            return (128, 256);
+        } elsif($domain eq 'nistp384') {
+            return (192, 384);
+        } elsif($domain eq 'nistp521') {
+            return (256, 521);
+        } elsif($domain eq '1.3.132.0.1') { # nistk163
+            return (80, 163);
+        } elsif($domain eq '1.3.132.0.26') { # nistb233
+            return (112, 233);
+        } elsif($domain eq '1.3.132.0.16') { # nistk283
+            return (128, 283);
+        } elsif($domain eq '1.3.132.0.36') { # nistk409
+            return (192, 409);
+        } elsif($domain eq '1.3.132.0.37') { # nistb409
+            return (192, 409);
+        } elsif($domain eq '1.3.132.0.38') { # nistt571
+            return (256, 571);
+        } else {
+            die "ERROR: unrecognized EC domain parameters $domain\n";
+        }
+    } else {
+        die "ERROR: unrecognized key type $type\n";
+    }
+}
+
+sub isWeak($) {
+    my $keyid = shift;
+    return $info{$keyid}->{strength} < $minStrength;
+}
+
+## Parse command line
+
+while(@ARGV > 0 and $ARGV[0] =~ /^-/) {
+    my $opt = shift;
+    if($opt eq "--help") {
+        print
+"Usage:
+  ssh-graph [OPTIONS] [--] [USER@]HOST ...
+Options:
+  --no-local            Don't include local .ssh
+  --local NAME          Read local .ssh, local host is NAME
+  --verbose             Verbose operation
+  --strip SUFFIX        Suffix to strip from key names
+  --strength BITS       Minimum SP800-57 security strength
+  --help                Display usage message
+  --version             Display version string
+";
+        exit 0;
+    } elsif($opt eq "--version") {
+        print "$VERSION\n";
+        exit 0;
+    } elsif($opt eq "--no-local") {
+        $local = 0;
+    } elsif($opt eq "--local") {
+        $local = 1;
+        $localName = shift;
+    } elsif($opt eq "--verbose") {
+        $verbose = 1;
+    } elsif($opt eq "--strip") {
+        $strip = shift;
+    } elsif($opt eq "--strength") {
+        $minStrength = shift;
+    } elsif($opt eq "--") {
+        last;
+    } else {
+        die "ERROR: unknown option '$opt'\n";
+    }
+}
+
+die "ERROR: no hosts specified\n" unless @ARGV > 0 or $local;
+
+## Read local keys and configuration
+
+if($local) {
+    if(!defined $localName) {
+        my @u = POSIX::uname();
+        $localName = $u[1];
+    }
+    print STDERR "Checking $localName...\n" if $verbose;
+    for my $pubkey (<$ENV{HOME}/.ssh/*.pub>) {
+        my $privkey = privkey($pubkey);
+        if(defined $privkey && -e $privkey) {
+            print STDERR "  Key: $pubkey\n" if $verbose;
+            hasKey($localName, readLocalFile($pubkey));
+        }
+    }
+    for my $ak (@ak) {
+        my $file = "$ENV{HOME}/.ssh/$ak";
+        if(-e $file) {
+            print STDERR "  Authorized keys: $file\n" if $verbose;
+            trustsKeys($localName, readLocalFile($file));
+        }
+    }
+}
+
+## Read remote keys and configuration
+
+for my $host (@ARGV) {
+    print STDERR "Checking $host...\n" if $verbose;
+    my @pubkeys = listRemoteFiles($host, ".ssh/*.pub");
+    for my $pubkey (listRemoteFiles($host, ".ssh/*.pub")) {
+        my $privkey = privkey($pubkey);
+        if(defined $privkey && remoteFileExists($host, $privkey)) {
+            print STDERR "  Key: $pubkey\n" if $verbose;
+            hasKey($host, readRemoteFile($host, $pubkey));
+        }
+    }
+    for my $ak (@ak) {
+        my $file = ".ssh/$ak";
+        if(remoteFileExists($host, $file)) {
+            print STDERR "  Authorized keys: $file\n" if $verbose;
+            trustsKeys($host, readRemoteFile($host, $file));
+        }
+    }
+}
+
+## Look for shared names
+
+my %hostsByName = ();           # hostsByName{HOST}->{...}
+my %keysByName = ();            # keysByName{NAME}->{KEYID} = 1
+for my $keyid (sort keys %info) {
+    $keysByName{$info{$keyid}->{name}}->{$keyid} = 1;
+    for my $host (keys %{$has{$keyid}}, keys %{$trusts{$keyid}}) {
+        $hostsByName{$host} = {};
+    }
+}
+for my $name (sort keys %keysByName) {
+    my @keyids = sort keys %{$keysByName{$name}};
+    if(@keyids > 1) {
+        print STDERR "WARNING: multiple keys have name $name\n";
+        for my $keyid (@keyids) {
+            my @accepters = sort keys %{$trusts{$keyid}};
+            print STDERR $keyid, " (", $info{$keyid}->{type};
+            if(@accepters > 0) {
+                print STDERR "; accepted by ", join(", ", @accepters);
+            } else {
+                print STDERR "; apparently unused";
+            }
+            print STDERR ")\n";
+            $info{$keyid}->{nameshare} = 1;
+        }
+        print STDERR "\n";
+    }
+}
+
+## Assign each host a serial number (for the node ID in the graph)
+
+my $hostSerial = 0;
+for my $host (sort keys %hostsByName) {
+    $hostsByName{$host}->{serial} = $hostSerial++;
+}
+
+## Construct the graph
+
+my @graph;
+push(@graph, "digraph \"ssh-graph\" {\n",
+     "  graph [rankdir=LR];\n");
+
+## For each key, node data
+
+for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) {
+    push(@graph, "  ", keyLabel($keyid),
+         " [label=\"", keyName($keyid), "|$info{$keyid}->{type}|$info{$keyid}->{strength} ($info{$keyid}->{bits}b)\",",
+         "shape=record");
+    my $weak = isWeak($keyid);
+    my @accepted = keys %{$trusts{$keyid}};
+    my $fontcolor = "black";
+    my $color = "black";
+    my $fillcolor = "";
+    if($weak) {
+        # Weak keys outlined in red
+        $color = "red";
+        # Weak keys that something trusts filled in red
+        if(@accepted > 0) {
+            $fillcolor = "red";
+            $fontcolor = "white";
+        }
+    } elsif(@accepted == 0) {
+        # Non-weak keys that nothing trusts in grey
+        $color = "grey";
+        $fontcolor = "grey";
+    }
+    # Keys with multiple names in green (only one name is shown)
+    $fontcolor = "green" if $info{$keyid}->{multinamed};
+    # Keys which share names with other keys in blue
+    $fontcolor = "blue" if $info{$keyid}->{nameshare};
+    push(@graph, ",color=$color,fontcolor=$fontcolor");
+    push(@graph, ",fillcolor=$fillcolor,style=filled") if $fillcolor ne '';
+    push(@graph, "];\n");
+    # More detail warning to stderr for weak keys that something trusts
+    if($weak) {
+        for my $host (sort keys %{$trusts{$keyid}}) {
+            print STDERR "WARNING: $host trusts weak key ", keyName($keyid), "\n", $keyid, "\n\n";
+        }
+    }
+}
+
+## For each host, node data
+
+for my $host (sort keys %hostsByName) {
+    push(@graph, "  h$hostsByName{$host}->{serial} [label=\"$host\"];\n");
+}
+
+## For each key that a host has, an edge from host to key
+
+for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %has) {
+    my @hosts = sort keys %{$has{$keyid}};
+    if(@hosts > 1) {
+        print STDERR "WARNING: multiple hosts have key ", keyName($keyid), ": ",
+             join(", ", @hosts), "\n";
+        print STDERR "$keyid\n\n";
+    }
+    # TODO print a warning on stderr?
+    # Edges to keys shared between multiple hosts in blue
+    for my $host (@hosts) {
+        my $color = "black";
+        $color = "blue" if @hosts > 1;
+        push(@graph, "  h$hostsByName{$host}->{serial} -> ", keyLabel($keyid),
+             " [color=$color];\n");
+    }
+}
+
+sub intersects {
+    my ($a, $b) = @_;
+    for my $k (keys %$a) {
+        return 1 if exists $$b{$k};
+    }
+    return 0;
+}
+
+## For each key that a host trusts, an edge from key to host
+
+for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %trusts) {
+    for my $host (sort keys %{$trusts{$keyid}}) {
+        my $color = "black";
+        # Edges for multiple keys on the same host in green
+        for my $keyid2 (keys %trusts) {
+            if($keyid2 ne $keyid
+               and exists $trusts{$keyid2}->{$host}
+               and intersects($has{$keyid}, $has{$keyid2})) {
+                print STDERR "$host:\n  $info{$keyid}->{name}\n  $info{$keyid2}->{name}\n";
+                $color = "green";
+                last;
+            }
+        }
+        # Edges from weak keys in red
+        $color = "red" if isWeak($keyid);
+        push(@graph, "  ", keyLabel($keyid), " -> h$hostsByName{$host}->{serial} [color=$color];\n");
+    }
+}
+
+push(@graph, "}\n");
+
+(print STDOUT @graph
+    and close STDOUT)
+    or die "ERROR: stdout: $!\n";

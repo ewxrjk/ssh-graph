@@ -1,0 +1,5 @@
+MANIFEST
+Makefile.PL
+README.md
+COPYING
+bin/ssh-graph

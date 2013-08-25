@@ -1,0 +1,2 @@
+version=3
+https://github.com/ewxrjk/ssh-graph   .*/ssh-graph-?(\d[\d.-]+)\.(?:tar(?:\.gz|\.bz2)?|tgz|zip)$

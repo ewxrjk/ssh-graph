@@ -1,0 +1,17 @@
+Source: ssh-graph
+Section: devel
+Priority: optional
+Maintainer: Richard Kettlewell <rjk@terraraq.org.uk>
+Build-Depends: debhelper (>= 8)
+Build-Depends-Indep: perl,perl-modules
+Standards-Version: 3.9.2
+Homepage: https://github.com/ewxrjk/ssh-graph
+
+Package: ssh-graph
+Architecture: all
+Depends: ${misc:Depends}, ${perl:Depends}
+Recommends: graphviz
+Description: Graph SSH key distribution and check for anomalies
+ This program generates a Graphiz-format file showing the trust and
+ control relationships between accounts and SSH keys.  Weak keys and
+ other anomalies are highlighted.
