@@ -488,10 +488,10 @@ for my $name (sort keys %keysByName) {
     if(@keyids > 1) {
         print STDERR "WARNING: multiple keys have name $name\n";
         for my $keyid (@keyids) {
-            my @accepters = sort keys %{$trusts{$keyid}};
+            my @trusters = sort keys %{$trusts{$keyid}};
             print STDERR $keyid, " (", $info{$keyid}->{type};
-            if(@accepters > 0) {
-                print STDERR "; accepted by ", join(", ", @accepters);
+            if(@trusters > 0) {
+                print STDERR "; trusted by ", join(", ", @trusters);
             } else {
                 print STDERR "; apparently unused";
             }
@@ -522,7 +522,7 @@ for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) 
          " [label=\"", keyName($keyid), "|$info{$keyid}->{type}|$info{$keyid}->{strength} ($info{$keyid}->{bits}b)\",",
          "shape=record");
     my $weak = isWeak($keyid);
-    my @accepted = keys %{$trusts{$keyid}};
+    my @trusters = keys %{$trusts{$keyid}};
     my $fontcolor = "black";
     my $color = "black";
     my $fillcolor = "";
@@ -530,11 +530,11 @@ for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) 
         # Weak keys outlined in red
         $color = "red";
         # Weak keys that something trusts filled in red
-        if(@accepted > 0) {
+        if(@trusters > 0) {
             $fillcolor = "red";
             $fontcolor = "white";
         }
-    } elsif(@accepted == 0) {
+    } elsif(@trusters == 0) {
         # Non-weak keys that nothing trusts in grey
         $color = "grey";
         $fontcolor = "grey";
