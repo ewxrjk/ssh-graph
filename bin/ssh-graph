@@ -89,8 +89,8 @@ The output is an input file for Graphviz.
 =head2 Keys
 
 Each key is shown as a box.  The first row is the name of the key, the
-second the key type and the third an approximation to the key size in
-bits.
+second the key type and the third the key strength and (in brackets)
+size.
 
 If the box is red then that means the key is weak (as defined by the
 B<--strength> options).
