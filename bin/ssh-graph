@@ -59,6 +59,15 @@ Specifies a suffix to strip from key names.
 The minimum security strength for a key not to be considered weak.
 The default is 112.
 
+=item B<--show-untrusted>
+
+Show keys that nothing trusts.  This is the default.
+
+=item B<--no-show-untrusted>
+
+Don't show keys that nothing trusts.
+Note that this hides even weak keys.
+
 =item B<--verbose>
 
 Print progress messages to standard error.
@@ -93,7 +102,7 @@ situations.
 If the box is grey then that means it can access no (known) host.
 (The test for weakness overrides this check.)  Such keys may be
 candidates for deletion, though they may be used by some host not
-listed.
+listed.  (To hide such keys, use the B<--no-show-untrusted> option.)
 
 If the text is green then that means this key has more than one name.
 This isn't necessarily a problem but is very confusing.
@@ -179,6 +188,7 @@ our @ak = ("authorized_keys", "authorized_keys2");
 our $keySerial = 0;     # counter for key serial number
 our $strip;             # suffix to strip from key names
 our $minStrength = 112; # minimum security strength
+our $showUntrusted = 1; # --show-untrusted
 
 sub privkey($) {
     local $_ = shift;
@@ -401,6 +411,7 @@ Options:
   --verbose             Verbose operation
   --strip SUFFIX        Suffix to strip from key names
   --strength BITS       Minimum SP800-57 security strength
+  --[no]-show-untrusted Show (default) or hide untrusted keys
   --help                Display usage message
   --version             Display version string
 ";
@@ -419,6 +430,10 @@ Options:
         $strip = shift;
     } elsif($opt eq "--strength") {
         $minStrength = shift;
+    } elsif($opt eq "--no-show-untrusted") {
+        $showUntrusted = 0;
+    } elsif($opt eq "--show-untrusted") {
+        $showUntrusted = 1;
     } elsif($opt eq "--") {
         last;
     } else {
@@ -520,6 +535,7 @@ push(@graph, "digraph \"ssh-graph\" {\n",
 for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) {
     my $weak = isWeak($keyid);
     my @trusters = keys %{$trusts{$keyid}};
+    $info{$keyid}->{trusters} = \@trusters;
     my $fontcolor = "black";
     my $color = "black";
     my $fillcolor = "";
@@ -536,6 +552,7 @@ for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) 
         $color = "grey";
         $fontcolor = "grey";
     }
+    next unless @trusters > 0 or $showUntrusted;
     # Keys with multiple names in green (only one name is shown)
     $fontcolor = "green" if $info{$keyid}->{multinamed};
     # Keys which share names with other keys in blue
@@ -562,6 +579,7 @@ for my $host (sort keys %hostsByName) {
 ## For each key that a host has, an edge from host to key
 
 for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %has) {
+    next unless @{$info{$keyid}->{trusters}} > 0 or $showUntrusted;
     my @hosts = sort keys %{$has{$keyid}};
     if(@hosts > 1) {
         print STDERR "WARNING: multiple hosts have key ", keyName($keyid), ": ",
