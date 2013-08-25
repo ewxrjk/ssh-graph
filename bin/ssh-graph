@@ -34,7 +34,7 @@ B<ssh-graph> generates a Graphviz source file showing the relationship
 between keys and hosts, and prints warnings about anything it doesn't
 like.
 
-It must be able to access the host listed on the command line via SSH.
+It must be able to access the hosts listed on the command line via SSH.
 
 =head1 OPTIONS
 
@@ -145,12 +145,12 @@ versions.
 
 =head2 SSH Protocol Version 1
 
-SSH protocol version 1 s considered broken and keys for it are
+SSH protocol version 1 is considered broken and keys for it are
 assigned a security strength of 0, regardless of key size.
 
 =head2 Identifying Keys
 
-Private keys are identified by looking for public keys in I<.ssh>
+Private keys are identified by looking for public keys in the I<.ssh>
 directory and assuming that any appropriately named file must be a
 copy of the corresponding private key.
 
