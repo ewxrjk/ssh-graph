@@ -518,9 +518,6 @@ push(@graph, "digraph \"ssh-graph\" {\n",
 ## For each key, node data
 
 for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) {
-    push(@graph, "  ", keyLabel($keyid),
-         " [label=\"", keyName($keyid), "|$info{$keyid}->{type}|$info{$keyid}->{strength} ($info{$keyid}->{bits}b)\",",
-         "shape=record");
     my $weak = isWeak($keyid);
     my @trusters = keys %{$trusts{$keyid}};
     my $fontcolor = "black";
@@ -543,7 +540,9 @@ for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) 
     $fontcolor = "green" if $info{$keyid}->{multinamed};
     # Keys which share names with other keys in blue
     $fontcolor = "blue" if $info{$keyid}->{nameshare};
-    push(@graph, ",color=$color,fontcolor=$fontcolor");
+    push(@graph, "  ", keyLabel($keyid),
+         " [label=\"", keyName($keyid), "|$info{$keyid}->{type}|$info{$keyid}->{strength} ($info{$keyid}->{bits}b)\",",
+         "shape=record,color=$color,fontcolor=$fontcolor");
     push(@graph, ",fillcolor=$fillcolor,style=filled") if $fillcolor ne '';
     push(@graph, "];\n");
     # More detail warning to stderr for weak keys that something trusts
