@@ -269,7 +269,7 @@ sub parseKeyValue($) {
             protocol => 1,
             name => $4,
             bits => $1,
-            strength => 0,     # protocol assumed to inherently broken
+            strength => 0,     # protocol 1 assumed to be inherently broken
         };
     } elsif($line =~ /^\s*([a-z0-9\-]+)\s+([0-9a-z\+\/=]+)\s+(.*)$/i) {
         # 2: type keydata comment
