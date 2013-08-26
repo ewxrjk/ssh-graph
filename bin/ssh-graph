@@ -297,7 +297,7 @@ sub trustsKeys($@) {
 sub keyName($) {
     my $keyid = shift;
     my $name = ($info{$keyid}->{name} or $keyid);
-    $name =~ s/\Q$strip\E$//;
+    $name =~ s/\Q$strip\E$// if defined $strip;
     return $name;
 }
 
