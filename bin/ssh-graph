@@ -234,46 +234,57 @@ sub remoteFileExists($$) {
 
 sub parseKey($$$) {
     my ($host, $line, $what) = @_;
-    my $keyid;
-    my $strength;
-    my $type;
-    my $protocol;
-    my $name;
-    my $bits;
-    if($line =~ /^(\d+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+(.*)$/i) {
-        # 1: bits exponent modulus comment
-        $type = "rsa";
-        $strength = $1;
-        $keyid = "$2-$3";
-        $protocol = 1;
-        $name = $4;
-        $bits = $1;
-        $strength = 0;          # protocol assumed to inherently broken
-    } elsif($line =~ /^([a-z0-9\-]+)\s+([0-9a-z\+\/=]+)\s+(.*)$/i) {
-        # 2: type keydata comment
-        $type = $1;
-        $keyid = $2;
-        $protocol = 2;
-        $name = $3;
-        ($strength, $bits) = keyStrength($2);
-    } else {
-        die "ERROR: $host has incomprehensible $what $line\n";
+    my $k = parseKeyValue($line);
+    if(!defined $k
+       and $line =~ /^\s*([^\s\"]|\"([^\"]|\\\")*\")+\s+(.*)/) {
+        my $suffix = $3;
+        $k = parseKeyValue($suffix);
     }
-    $info{$keyid}->{strength} = $strength if defined $strength;
-    $info{$keyid}->{bits} = $bits if defined $bits;
-    $info{$keyid}->{type} = $type if defined $type;
-    $info{$keyid}->{protocol} = $protocol if defined $protocol;
-    if(defined $name) {
+    die "ERROR: $host has incomprehensible $what $line\n"
+        unless defined $k;
+    my $keyid = $k->{keyid};
+    for my $p ("strength", "bits", "type", "protocol") {
+        $info{$keyid}->{$p} = $k->{$p} if exists $k->{$p};
+    }
+    if(exists $k->{name}) {
         if(exists $info{$keyid}->{name}
-           and $name ne $info{$keyid}->{name}) {
-            print STDERR "WARNING: key $info{$keyid}->{name} is also called $name\n";
+           and $k->{name} ne $info{$keyid}->{name}) {
+            print STDERR "WARNING: key $info{$keyid}->{name} is also called $k-.{name}\n";
             $info{$keyid}->{multinamed} = 1;
         } else {
-            $info{$keyid}->{name} = $name;
+            $info{$keyid}->{name} = $k->{name};
         }
     }
     $info{$keyid}->{serial} = $keySerial++ unless exists $info{$keyid}->{serial};
     return $keyid;
+}
+
+sub parseKeyValue($) {
+    my $line = shift;
+    if($line =~ /^\s*(\d+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+(.*)$/i) {
+        # 1: bits exponent modulus comment
+        return {
+            type => "rsa",
+            keyid => "$2-$3",
+            protocol => 1,
+            name => $4,
+            bits => $1,
+            strength => 0,     # protocol assumed to inherently broken
+        };
+    } elsif($line =~ /^\s*([a-z0-9\-]+)\s+([0-9a-z\+\/=]+)\s+(.*)$/i) {
+        # 2: type keydata comment
+        my ($strength, $bits) = keyStrength($2);
+        return  {
+            type => $1,
+            keyid => $2,
+            protocol => 2,
+            name => $3,
+            strength => $strength,
+            bits => $bits
+        };
+    } else {
+        return undef;
+    }
 }
 
 sub hasKey($@) {
