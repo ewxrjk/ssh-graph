@@ -190,6 +190,8 @@ our $strip;             # suffix to strip from key names
 our $minStrength = 112; # minimum security strength
 our $showUntrusted = 1; # --show-untrusted
 
+# Convert the filename of a public key to the filename of the assumed
+# corresponding private key.
 sub privkey($) {
     local $_ = shift;
     if(/(.*)\.pub/) {
@@ -199,6 +201,7 @@ sub privkey($) {
     }
 }
 
+# Read the contents of a local file and return it as a list.
 sub readLocalFile($) {
     my $path = shift;
     open(FILE, "<", $path) or die "ERROR: $path: $!\n";
@@ -207,6 +210,7 @@ sub readLocalFile($) {
     return @contents;
 }
 
+# Execute a command remotely and return its output as a list.
 sub remoteCommand($$) {
     my ($host, $cmd) = @_;
     open(CMD, "-|", "ssh -x $host \Q$cmd\E")
@@ -217,21 +221,25 @@ sub remoteCommand($$) {
     return @contents;
 }
 
+# Read the contents of a remote file and return it as a list.
 sub readRemoteFile($$) {
     my ($host, $file) = @_;
     return remoteCommand($host, "cat $file");
 }
 
+# List the remote files matching a glob pattern.
 sub listRemoteFiles($$) {
     my ($host, $pattern) = @_;
     return remoteCommand($host, "ls -1 $pattern || true");
 }
 
+# Return true if a remote file exists.
 sub remoteFileExists($$) {
     my ($host, $file) = @_;
     return !system("ssh -x $host test -e \Q$file\E");
 }
 
+# Parse a line from a pubkey or authorized keys file.
 sub parseKey($$$) {
     my ($host, $line, $what) = @_;
     my $k = parseKeyValue($line);
@@ -259,6 +267,7 @@ sub parseKey($$$) {
     return $keyid;
 }
 
+# Parse the key part of a pubkey (i.e. not including any prior options).
 sub parseKeyValue($) {
     my $line = shift;
     if($line =~ /^\s*(\d+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+(.*)$/i) {
@@ -287,6 +296,7 @@ sub parseKeyValue($) {
     }
 }
 
+# Record the a host has a copy of a key
 sub hasKey($@) {
     my ($host, @key) = @_;
     for my $line (@key) {
@@ -295,6 +305,7 @@ sub hasKey($@) {
     }
 }
 
+# Records that a host trusts a list of keys
 sub trustsKeys($@) {
     my ($host, @keys) = @_;
     for my $line (@keys) {
@@ -305,6 +316,7 @@ sub trustsKeys($@) {
     }
 }
 
+# Construct the name for a key to display in the graph
 sub keyName($) {
     my $keyid = shift;
     my $name = ($info{$keyid}->{name} or $keyid);
@@ -312,12 +324,14 @@ sub keyName($) {
     return $name;
 }
 
+# Return the node ID for a key
 sub keyLabel($) {
     my $keyid = shift;
     return "k$info{$keyid}->{serial}";
 }
 
-# Returns (strength, bits)
+# Returns (strength, bits) for an SSH v2 public key
+#
 # http://csrc.nist.gov/publications/nistpubs/800-57/sp800-57_part1_rev3_general.pdf
 sub keyStrength($) {
     my $decoded = decode_base64($_[0]);
@@ -403,6 +417,7 @@ sub keyStrength($) {
     }
 }
 
+# Return true if a key is considered weak
 sub isWeak($) {
     my $keyid = shift;
     return $info{$keyid}->{strength} < $minStrength;
