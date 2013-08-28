@@ -249,7 +249,7 @@ sub parseKey($$$) {
     if(exists $k->{name}) {
         if(exists $info{$keyid}->{name}
            and $k->{name} ne $info{$keyid}->{name}) {
-            print STDERR "WARNING: key $info{$keyid}->{name} is also called $k-.{name}\n";
+            print STDERR "WARNING: key $info{$keyid}->{name} is also called $k->{name}\n";
             $info{$keyid}->{multinamed} = 1;
         } else {
             $info{$keyid}->{name} = $k->{name};
