@@ -1,3 +1,9 @@
+ssh-graph (0.3) unstable; urgency=low
+
+  * Fix mangled warning message.
+
+ -- Richard Kettlewell <rjk@greenend.org.uk>  Fri, 17 Apr 2015 13:55:51 +0100
+
 ssh-graph (0.2) unstable; urgency=low
 
   * Parse authorized key files the same way OpenSSH does

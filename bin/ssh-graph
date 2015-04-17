@@ -175,7 +175,7 @@ B<ssh>(1), B<dot>(1)
 
 =cut
 
-our $VERSION = '0.2';
+our $VERSION = '0.3';
 
 our %has = ();          # HOST a copy of KEYID's privkey if has{KEYID}->{HOST}
 our %trusts = ();       # HOST trusts KEYID if trusts{KEYID}->{HOST}
