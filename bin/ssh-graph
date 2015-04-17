@@ -609,7 +609,7 @@ for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %has) {
     next unless @{$info{$keyid}->{trusters}} > 0 or $showUntrusted;
     my @hosts = sort keys %{$has{$keyid}};
     if(@hosts > 1) {
-        print STDERR "WARNING: multiple hosts have key ", keyName($keyid), ": ",
+        print STDERR "WARNING: multiple hosts have private key ", keyName($keyid), ": ",
              join(", ", @hosts), "\n";
         print STDERR "$keyid\n\n";
     }
