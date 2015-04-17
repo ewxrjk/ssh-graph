@@ -36,7 +36,9 @@ like.
 
 It must be able to access the hosts listed on the command line via SSH.
 
-=head1 OPTIONS
+=head1 USAGE
+
+=head2 Options
 
 =over 4
 
@@ -81,6 +83,29 @@ Display a usage message.
 Display the version string.
 
 =back
+
+=head2 Host Syntax
+
+The simplest host syntax is just I<HOSTNAME> or
+I<USER>B<@>I<HOSTNAME>.  This is familiar from SSH.  The hostname must
+be recognizable to your local SSH client.
+
+If a colon appears in the host then a more complex syntax is used.
+The general form is:
+
+I<CMD>B<:>I<ARG1>B<:>...B<:>I<ARGn>B<:>I<DIR>B<:>I<HOSTNAME>
+
+Here I<CMD> and I<ARG1> to I<ARGn> form the command to execute to
+reach the host; I<DIR> is the home directory to use; and I<HOSTNAME>
+is the name to give the host in the output.
+
+For example B<sudo:/root:root@local> means that B<sudo>(1) will be
+used to elevate privilege and the B<.ssh> directory in B</root> will
+be inspected, with the results reported as B<root@local>.
+
+A more complex example is B<sudo:ssh:-x:root@remote:/root:root@remote>
+which uses sudo locally to elevate privilege and then access a remote
+host via SSH.
 
 =head1 OUTPUT
 
@@ -180,6 +205,7 @@ our $VERSION = '0.3';
 our %has = ();          # HOST a copy of KEYID's privkey if has{KEYID}->{HOST}
 our %trusts = ();       # HOST trusts KEYID if trusts{KEYID}->{HOST}
 our %info = ();         # metadata abot KEYID: info{KEYID}->{...}
+our %command = ();      # command to access host
 
 our $verbose = 0;       # --verbose option
 our $local = 1;         # consult local ~/.ssh
@@ -213,9 +239,10 @@ sub readLocalFile($) {
 # Execute a command remotely and return its output as a list.
 sub remoteCommand($$) {
     my ($host, $cmd) = @_;
-    print STDERR "$host: $cmd\n" if $verbose;
-    open(CMD, "-|", "ssh -x $host \Q$cmd\E")
-        or die "ERROR: ssh $host: $!\n";
+    my @fullcmd = &{$command{$host}}($host, $cmd);
+    print STDERR "$host: ", join(" ", @fullcmd), "\n" if $verbose;
+    open(CMD, "-|", @fullcmd)
+        or die "ERROR: $host: $!\n";
     my @contents = <CMD>;
     (close CMD) or die "ERROR: ssh $host: $!/$?\n";
     chomp @contents;
@@ -237,7 +264,9 @@ sub listRemoteFiles($$) {
 # Return true if a remote file exists.
 sub remoteFileExists($$) {
     my ($host, $file) = @_;
-    return !system("ssh -x $host test -e \Q$file\E");
+    my @fullcmd = &{$command{$host}}($host, "test -e \Q$file\E");
+    print STDERR "$host: ", join(" ", @fullcmd), "\n" if $verbose;
+    return !system(@fullcmd);
 }
 
 # Parse a line from a pubkey or authorized keys file.
@@ -497,6 +526,22 @@ if($local) {
 ## Read remote keys and configuration
 
 for my $host (@ARGV) {
+    if($host =~ /:/) {
+        my @hostbits = split(/:/, $host);
+        $host = pop @hostbits;
+        my $dir = pop @hostbits;
+        $command{$host} = sub {
+            my $host = shift;
+            my $cmd = shift;
+            return (@hostbits, "sh", "-c", "cd \Q$dir\E && " . $cmd);
+        };
+    } else {
+        $command{$host} = sub {
+            my $host = shift;
+            my $cmd = shift;
+            return ("ssh", "-x", $host, $cmd);
+        };
+    }
     print STDERR "Checking $host...\n" if $verbose;
     my @pubkeys = listRemoteFiles($host, ".ssh/*.pub");
     for my $pubkey (listRemoteFiles($host, ".ssh/*.pub")) {
