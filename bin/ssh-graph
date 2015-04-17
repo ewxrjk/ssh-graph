@@ -360,6 +360,30 @@ sub keyLabel($) {
     return "k$info{$keyid}->{serial}";
 }
 
+# Returns the strength for a prime field with modulus 2^($bits-1)<p<2^$bits
+sub primeFieldStrength($) {
+    my $bits = shift;
+    if($bits < 1024) {
+        return (0, $bits);
+    } elsif($bits < 2048) {
+        return (80, $bits);
+    } elsif($bits < 3072) {
+        return (112, $bits);
+    } elsif($bits < 7680) {
+        return (128, $bits);
+    } elsif($bits < 15360) {
+        return (192, $bits);
+    } else {
+        return (256, $bits);
+    }
+}
+
+# Return the strength of a discrete log group with order 2^($bits-1)<q<2^$bits
+sub discreteLogStrength($) {
+    my $bits = shift;
+    return int($bits/2);
+}
+
 # Returns (strength, bits) for an SSH v2 public key
 #
 # http://csrc.nist.gov/publications/nistpubs/800-57/sp800-57_part1_rev3_general.pdf
@@ -374,19 +398,7 @@ sub keyStrength($) {
         my ($type, $e, $n) = unpack("l>/a l>/a l>/a", $decoded);
         $n =~ s/^\0*//;
         my $bits = 8 * length($n);
-        if($bits < 1024) {
-            return (0, $bits);
-        } elsif($bits < 2048) {
-            return (80, $bits);
-        } elsif($bits < 3072) {
-            return (112, $bits);
-        } elsif($bits < 7680) {
-            return (128, $bits);
-        } elsif($bits < 15360) {
-            return (192, $bits);
-        } else {
-            return (256, $bits);
-        }
+        return (primeFieldStrength($bits), $bits);
     } elsif($type eq 'ssh-dss') {
         # DSA key format:
         #    http://tools.ietf.org/html/rfc4253#section-6.6
@@ -396,19 +408,9 @@ sub keyStrength($) {
         $q =~ s/^\0*//;
         my $lbits = 8 * length($p);
         my $nbits = 8 * length($q);
-        if($lbits < 1024 or $nbits < 160) {
-            return (0, $lbits)
-        } elsif($lbits < 2048 or $nbits < 224) {
-            return (80, $lbits);
-        } elsif($lbits < 3072 or $nbits < 256) {
-            return (112, $lbits);
-        } elsif($lbits < 7680 or $nbits < 384) {
-            return (128, $lbits);
-        } elsif($lbits < 15360 or $nbits < 512) {
-            return (192, $lbits);
-        } else {
-            return (256, $lbits);
-        }
+        my $lstrength = primeFieldStrength($lbits);
+        my $nstrength = discreteLogStrength($nbits);
+        return ($lstrength < $nstrength ? $lstrength : $nstrength, $lbits);
     } elsif($type =~ /^ecdsa-/) {
         my ($type, $domain, $q) = unpack("l>/a l>/a l>/a", $decoded);
         # Key format:
