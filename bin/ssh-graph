@@ -213,6 +213,7 @@ sub readLocalFile($) {
 # Execute a command remotely and return its output as a list.
 sub remoteCommand($$) {
     my ($host, $cmd) = @_;
+    print STDERR "$host: $cmd\n" if $verbose;
     open(CMD, "-|", "ssh -x $host \Q$cmd\E")
         or die "ERROR: ssh $host: $!\n";
     my @contents = <CMD>;
