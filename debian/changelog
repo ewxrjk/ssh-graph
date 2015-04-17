@@ -1,3 +1,9 @@
+ssh-graph (0.4) unstable; urgency=low
+
+  * More flexible host syntax allows data to be pulled out of backups etc.
+
+ -- Richard Kettlewell <rjk@greenend.org.uk>  Fri, 17 Apr 2015 22:07:35 +0100
+
 ssh-graph (0.3) unstable; urgency=low
 
   * Fix mangled warning message.
