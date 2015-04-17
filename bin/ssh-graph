@@ -523,6 +523,7 @@ if($local) {
             trustsKeys($localName, readLocalFile($file));
         }
     }
+    print STDERR "\n" if $verbose;
 }
 
 ## Read remote keys and configuration
@@ -560,6 +561,7 @@ for my $host (@ARGV) {
             trustsKeys($host, readRemoteFile($host, $file));
         }
     }
+    print STDERR "\n" if $verbose;
 }
 
 ## Look for shared names
