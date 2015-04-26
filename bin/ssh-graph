@@ -202,7 +202,8 @@ B<ssh>(1), B<dot>(1)
 
 our $VERSION = '0.4';
 
-our %has = ();          # HOST a copy of KEYID's privkey if has{KEYID}->{HOST}
+our %has = ();          # HOST has KEYID's privkey if has{KEYID}->{HOST}
+our %knows = ();	# HOST has KEYID's privkey if KEYID in knows{HOST}
 our %trusts = ();       # HOST trusts KEYID if trusts{KEYID}->{HOST}
 our %info = ();         # metadata abot KEYID: info{KEYID}->{...}
 our %command = ();      # command to access host
@@ -215,6 +216,7 @@ our $keySerial = 0;     # counter for key serial number
 our $strip;             # suffix to strip from key names
 our $minStrength = 112; # minimum security strength
 our $showUntrusted = 1; # --show-untrusted
+our $subgraphs = 0;	# use subgraph clusters (not pretty...)
 
 # Convert the filename of a public key to the filename of the assumed
 # corresponding private key.
@@ -606,12 +608,58 @@ my @graph;
 push(@graph, "digraph \"ssh-graph\" {\n",
      "  graph [rankdir=LR];\n");
 
-## For each key, node data
-
+## Identify trusters
 for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) {
-    my $weak = isWeak($keyid);
     my @trusters = keys %{$trusts{$keyid}};
     $info{$keyid}->{trusters} = \@trusters;
+}
+
+## Identify which host knows which key
+for my $host (sort keys %hostsByName) {
+    $knows{$host} = []
+}
+for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %has) {
+    next unless @{$info{$keyid}->{trusters}} > 0 or $showUntrusted;
+    my @hosts = sort keys %{$has{$keyid}};
+    if(@hosts > 1) {
+        print STDERR "WARNING: multiple hosts have private key ", keyName($keyid), ": ",
+             join(", ", @hosts), "\n";
+        print STDERR "$keyid\n\n";
+    }
+    # For each host accumulate a list of the keys that it uniquely knows
+    if(@hosts == 1) {
+	my $host = $hosts[0];
+	push(@{$knows{$host}}, $keyid);
+    }
+    # TODO print a warning on stderr?
+}
+
+# Node data for hosts, in subgraphs
+for my $host (sort keys %hostsByName) {
+    my $serial = $hostsByName{$host}->{serial};
+    my $p = "";
+    my @keys = @{$knows{$host}};
+    if(@keys > 0 && $subgraphs) {
+	push(@graph, "  subgraph cluster_$serial {\n");
+	#push(@graph, "    color=black;\n");
+	$p = "  ";
+    }
+    push(@graph, "$p  h$serial [label=\"$host\"];\n");
+    for my $keyid (@keys) {
+	my @hosts = sort keys %{$has{$keyid}};
+	if(@hosts == 1) {
+	    push(@graph, "$p  h$serial -> ", keyLabel($keyid),
+		 " [color=black];\n");
+	}
+    }
+    if(@keys > 0 && $subgraphs) {
+	push(@graph, "  }\n");
+    }
+}
+
+## Node data for keys
+for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) {
+    my $weak = isWeak($keyid);
     my $fontcolor = "black";
     my $color = "black";
     my $fillcolor = "";
@@ -619,16 +667,16 @@ for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) 
         # Weak keys outlined in red
         $color = "red";
         # Weak keys that something trusts filled in red
-        if(@trusters > 0) {
+        if(@{$info{$keyid}->{trusters}} > 0) {
             $fillcolor = "red";
             $fontcolor = "white";
         }
-    } elsif(@trusters == 0) {
+    } elsif(@{$info{$keyid}->{trusters}} == 0) {
         # Non-weak keys that nothing trusts in grey
         $color = "grey";
         $fontcolor = "grey";
     }
-    next unless @trusters > 0 or $showUntrusted;
+    next unless @{$info{$keyid}->{trusters}} > 0 or $showUntrusted;
     # Keys with multiple names in green (only one name is shown)
     $fontcolor = "green" if $info{$keyid}->{multinamed};
     # Keys which share names with other keys in blue
@@ -646,29 +694,18 @@ for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) 
     }
 }
 
-## For each host, node data
-
-for my $host (sort keys %hostsByName) {
-    push(@graph, "  h$hostsByName{$host}->{serial} [label=\"$host\"];\n");
-}
-
-## For each key that a host has, an edge from host to key
-
+## Keys known to more than one host
 for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %has) {
     next unless @{$info{$keyid}->{trusters}} > 0 or $showUntrusted;
     my @hosts = sort keys %{$has{$keyid}};
     if(@hosts > 1) {
-        print STDERR "WARNING: multiple hosts have private key ", keyName($keyid), ": ",
-             join(", ", @hosts), "\n";
-        print STDERR "$keyid\n\n";
-    }
-    # TODO print a warning on stderr?
-    # Edges to keys shared between multiple hosts in blue
-    for my $host (@hosts) {
-        my $color = "black";
-        $color = "blue" if @hosts > 1;
-        push(@graph, "  h$hostsByName{$host}->{serial} -> ", keyLabel($keyid),
-             " [color=$color];\n");
+	for my $host (@hosts) {
+	    my $color = "black";
+	    if(@hosts > 1) {
+		push(@graph, "  h$hostsByName{$host}->{serial} -> ", keyLabel($keyid),
+		     " [color=blue];\n");
+	    }
+	}
     }
 }
 
