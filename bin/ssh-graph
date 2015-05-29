@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 #
-# Copyright © 2013 Richard Kettlewell
+# Copyright © 2013-2015 Richard Kettlewell
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -200,7 +200,7 @@ B<ssh>(1), B<dot>(1)
 
 =cut
 
-our $VERSION = '0.4';
+our $VERSION = '0.5';
 
 our %has = ();          # HOST has KEYID's privkey if has{KEYID}->{HOST}
 our %knows = ();	# HOST has KEYID's privkey if KEYID in knows{HOST}
@@ -446,6 +446,9 @@ sub keyStrength($) {
         } else {
             die "ERROR: unrecognized EC domain parameters $domain\n";
         }
+    } elsif($type eq 'ssh-ed25519') {
+        # ed25519 keys are always 256 bits long
+        return (128, 256);
     } else {
         die "ERROR: unrecognized key type $type\n";
     }

@@ -1,3 +1,9 @@
+ssh-graph (0.5) unstable; urgency=medium
+
+  * Support ed25519 keys.
+
+ -- Richard Kettlewell <rjk@greenend.org.uk>  Fri, 29 May 2015 17:13:25 +0100
+
 ssh-graph (0.4) unstable; urgency=low
 
   * More flexible host syntax allows data to be pulled out of backups etc.
