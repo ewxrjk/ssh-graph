@@ -2,7 +2,7 @@ use warnings;
 use strict;
 use Greenend::SSH::Key;
 use Greenend::SSH::User;
-use Test::Simple tests => 16;
+use Test::Simple tests => 20;
 
 my $u1 = Greenend::SSH::User->new(name => 'bob');
 my $u2 = Greenend::SSH::User->new(name => 'fred');
@@ -38,17 +38,28 @@ ok($u2_accepted[0] == $k1);
 
 my @critique = Greenend::SSH::User::critique();
 #print STDERR "\n", map("$_\n", @critique), "----\n";
-ok(@critique == 0);
+my @expect = ('Trouble with user fred',
+              '  Trusts weak key 04c2aa02e11c78269526f3f67a7c436a (root@sfere)');
+ok(@critique == scalar @expect,
+   "expect ".(scalar @expect)." got ".(scalar @critique));
+for my $n (0..$#expect) {
+    ok($critique[$n] eq $expect[$n],
+       "expect <$expect[$n]> got <$critique[$n]>");
+}
 
 $u2->add_accepts_key($k2);
 @critique = Greenend::SSH::User::critique();
 #print STDERR "\n", map("$_\n", @critique), "----\n";
-my @expect = ('Trouble with user fred',
+@expect =    ('Trouble with user fred',
+              '  Trusts weak key 04c2aa02e11c78269526f3f67a7c436a (root@sfere)',
+              '  Trusts weak key 35dd6a606baf6692f59e31138898b0f8 (richard@araminta)',
               '  User fred can access fred using multiple keys:',
               '    04c2aa02e11c78269526f3f67a7c436a (root@sfere)',
               '    35dd6a606baf6692f59e31138898b0f8 (richard@araminta)');
 
-ok(@critique == scalar @expect);
+ok(@critique == scalar @expect,
+   "expect ".(scalar @expect)." got ".(scalar @critique));
 for my $n (0..$#expect) {
-    ok($critique[$n] eq $expect[$n]);
+    ok($critique[$n] eq $expect[$n],
+       "expect <$expect[$n]> got <$critique[$n]>");
 }

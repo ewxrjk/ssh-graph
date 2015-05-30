@@ -4,6 +4,7 @@ use warnings;
 use strict;
 
 our %_users = ();
+our $_next_serial = 0;
 
 # new Greenend::SSH::User(KEY=>VALUE, ...)
 sub new {
@@ -16,6 +17,7 @@ sub initialize {
     my $self = shift;
     $self->{known_keys} = {};
     $self->{accepts_keys} = {};
+    $self->{serial} = $_next_serial++;
     while(@_ > 0) {
         my $key = shift;
         my $value = shift;
@@ -87,6 +89,8 @@ sub critique {
         my %accepted_users = ();
         my @trouble = ();
         for my $k (@accepted_keys) {
+            push(@trouble, "  Trusts weak key ".$k->get_id." ($k->{name})")
+                if $k->{strength} < $args{strength};
             for my $uu ($k->get_knowing_users()) {
                 $accepted_users{$uu->{name}} = 0
                     unless exists $accepted_users{$uu->{name}};
@@ -108,6 +112,7 @@ sub critique {
             push(@c, "Trouble with user $u->{name}", @trouble);
         }
     }
+    # TODO critique unused keys?
     return @c;
 }
 
