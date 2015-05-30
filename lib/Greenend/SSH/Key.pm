@@ -70,12 +70,17 @@ sub authorized_keys_fragment($$) {
     if(/^\s*(\d+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+(.*)$/i) {
         # 1: bits exponent modulus comment
         $self->{type} = "rsa";
-        $self->{keydata} = "$2-$3";
         $self->{n} = (new Math::BigInt($3))->as_hex();
         $self->{e} = (new Math::BigInt($2))->as_hex();
         $self->{protocol} = 1;
         $self->{name} = $4;
         $self->{bits} = $1;
+        $self->{n} =~ s/^(0x)?0*//i;
+        $self->{e} =~ s/^(0x)?0*//i;
+        $self->{keydata} = encode_base64(pack("l>/a l>/a l>/a",
+                                              "ssh-rsa",
+                                              pack("H*", $self->{e}),
+                                              pack("H*", $self->{n})));
     } elsif(/^\s*([a-z0-9\-]+)\s+([0-9a-z\+\/=]+)\s+(.*)$/i) {
         # 2: type keydata comment
         $self->{type} = $1;
@@ -84,10 +89,6 @@ sub authorized_keys_fragment($$) {
         $self->{name} = $3;
     } else {
         return 0;
-    }
-    if($self->{type} eq 'rsa') {
-        $self->{n} =~ s/^(0x)?0*//i;
-        $self->{e} =~ s/^(0x)?0*//i;
     }
     $self->set_strength();
     my $existing;
@@ -110,10 +111,6 @@ sub authorized_keys_fragment($$) {
 sub set_strength($) {
     # http://csrc.nist.gov/publications/nistpubs/800-57/sp800-57_part1_rev3_general.pdf
     my $self = shift;
-    if($self->{protocol} == 1) {
-        $self->{strength} = prime_strength($self->{bits});
-        return;
-    }
     my $decoded = decode_base64($self->{keydata});
     # Data type representations:
     #    http://tools.ietf.org/html/rfc4251#section-5
@@ -127,6 +124,8 @@ sub set_strength($) {
         $self->{bits} = 8 * length($n);
         $self->{n} = unpack("H*", $n);
         $self->{e} = unpack("H*", $e);
+        $self->{n} =~ s/^(0x)?0*//i;
+        $self->{e} =~ s/^(0x)?0*//i;
         $self->{strength} = prime_strength($self->{bits});
     } elsif($type eq 'ssh-dss') {
         $self->{type} = 'dsa';
