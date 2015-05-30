@@ -18,6 +18,8 @@ sub new {
 # OBJECT->initialize(KEY=>VALUE, ...)
 sub initialize {
     my $self = shift;
+    $self->{known_by} = {};
+    $self->{accepted_by} = {};
     while(@_ > 0) {
         my $key = shift;
         my $value = shift;
