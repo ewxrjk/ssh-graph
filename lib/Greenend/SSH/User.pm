@@ -3,8 +3,8 @@ use Greenend::SSH::Key;
 use warnings;
 use strict;
 
-our $next_id = 0;
-our %users = ();
+our $_next_id = 0;
+our %_users = ();
 
 # new Greenend::SSH::User(KEY=>VALUE, ...)
 sub new {
@@ -17,8 +17,8 @@ sub initialize {
     my $self = shift;
     $self->{known_keys} = {};
     $self->{accepts_keys} = {};
-    $self->{id} = ++$next_id;
-    $users{$self->{id}} = $self;
+    $self->{id} = ++$_next_id;
+    $_users{$self->{id}} = $self;
     while(@_ > 0) {
         my $key = shift;
         my $value = shift;
@@ -59,9 +59,13 @@ sub get_accepted_keys {
     return _keys(keys %{$self->{accepts_keys}});
 }
 
+########################################################################
+
 sub all_users {
-    return map($users{$_}, sort keys %users);
+    return map($_users{$_}, sort keys %_users);
 }
+
+########################################################################
 
 sub _keys {
     return map(Greenend::SSH::Key::get_by_id($_), sort @_);

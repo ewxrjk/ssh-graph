@@ -7,7 +7,7 @@ use Digest;
 use Math::BigInt;
 
 # Map IDs to key structures
-our %keys = ();
+our %_keys = ();
 
 # Hash for key fingerprints (anything acceptable to Digest.pm will do)
 our $fingerprint_hash = "MD5";
@@ -29,20 +29,102 @@ sub initialize {
         my $key = shift;
         my $value = shift;
         if($key eq 'pub_key_file') {
-            $self->read_pub_key_file($value);
+            $self->_read_pub_key_file($value);
         } elsif($key eq 'authorized_keys_line') {
-            $self->authorized_keys_line($value);
+            $self->_authorized_keys_line($value);
         } elsif($key eq 'origin') {
             $self->{origin} = $value;
         } else {
             die "Greenend::SSH::Key::initialize: unrecognized initialization key '$key'";
         }
     }
-    return $keys{$self->get_id()};
+    return $_keys{$self->get_id()};
 }
 
+# Get the ID of a key
+sub get_id($) {
+    my $self = shift;
+    die "Greenend::SSH::Key::get_id: key not initialized"
+        unless exists $self->{keydata};
+    # OpenSSH fingerprint format for protocol 2
+    my $d = Digest->new($fingerprint_hash);
+    $d->add(decode_base64($self->{keydata}));
+    return $d->hexdigest();
+}
+
+# Get a list of the places a key was found
+sub get_origins {
+    my $self = shift;
+    return sort keys %{$self->{origins}};
+}
+
+# Get a list of the names for this key
+sub get_names {
+    my $self = shift;
+    return sort keys %{$self->{names}};
+}
+
+# Get a list of accepting users
+sub get_accepting_users {
+    my $self = shift;
+    return _users(keys %{$self->{accepted_by}});
+}
+
+# Get a list of users who know this key
+sub get_knowing_users {
+    my $self = shift;
+    return _users(keys %{$self->{known_by}});
+}
+
+########################################################################
+
+# Get a key by ID
+sub get_by_id($) {
+    my $id = shift;
+    return $_keys{$id};
+}
+
+# Get a list of all keys
+sub all_keys {
+    return map($_keys{$_}, sort keys %_keys);
+}
+
+# Critique the set of all keys
+sub critique {
+    my %args = @_;
+    $args{strength} = 128 unless exists $args{strength};
+    my @c = ();
+    for my $k (all_keys()) {
+        my @names = $k->get_names();
+        my @origins = $k->get_origins();
+        my @known_by = $k->get_knowing_users();
+        my @trouble = ();
+        push(@trouble, "  Key has multiple names") if @names > 1;
+        push(@trouble, "  Key is usable with protocol 1") if $k->{protocol} < 2;
+        push(@trouble,
+             "  Key ".$k->get_id()." is known by multiple users:",
+             map("    $_->{name}", @known_by)) if @known_by > 1;
+        push(@trouble, "  $k->{type} $k->{bits} key is too weak")
+            if $k->{strength} < $args{strength};
+        if(@trouble) {
+            push(@c, "Trouble with key ".$k->get_id());
+            push(@c, @trouble);
+            push(@c, "  Names:",
+                 map("    $_", @names));
+            if(@origins > 0) {
+                push(@c,
+                     "  Origins:",
+                     map("    $_", @origins));
+            }
+        }
+    }
+    return @c;
+}
+
+########################################################################
+
 # Read a OpenSSH *.pub file
-sub read_pub_key_file($$) {
+sub _read_pub_key_file($$) {
     my $self = shift;
     my $path = shift;
     my $f = IO::File::new($path, "r");
@@ -53,28 +135,21 @@ sub read_pub_key_file($$) {
 }
 
 # Read one line in an OpenSSH authorized_keys file
-sub authorized_keys_line($$) {
+sub _authorized_keys_line($$) {
     my $self = shift;
     local $_ = shift;
     chomp $_;
-    if(!$self->authorized_keys_fragment($_)
+    if(!$self->_authorized_keys_fragment($_)
        and /^\s*([^\s\"]|\"([^\"]|\\\")*\")+\s+(.*)/) {
         my $suffix = $3;
-        if(!self->authorized_keys_fragment($suffix)) {
+        if(!self->_authorized_keys_fragment($suffix)) {
             die "ERROR: cannot parse key: $_\n";
         }
     }
     return $self;
 }
 
-sub hex_to_mpint($) {
-    local $_ = shift;
-    s/^(0x)?0*//i;
-    $_ = "00$_" if /^[90a-f]/i;
-    return pack("H*", $_);
-}
-
-sub authorized_keys_fragment($$) {
+sub _authorized_keys_fragment($$) {
     my $self = shift;
     local $_ = shift;
     if(/^\s*(\d+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+(.*)$/i) {
@@ -87,8 +162,8 @@ sub authorized_keys_fragment($$) {
         $self->{bits} = $1;
         $self->{keydata} = encode_base64(pack("l>/a l>/a l>/a",
                                               "ssh-rsa",
-                                              hex_to_mpint($e),
-                                              hex_to_mpint($n)));
+                                              _hex_to_mpint($e),
+                                              _hex_to_mpint($n)));
     } elsif(/^\s*([a-z0-9\-]+)\s+([0-9a-z\+\/=]+)\s+(.*)$/i) {
         # 2: type keydata comment
         $self->{type} = $1;
@@ -98,16 +173,16 @@ sub authorized_keys_fragment($$) {
     } else {
         return 0;
     }
-    $self->set_strength();
+    $self->_set_strength();
     my $existing;
-    if(exists $keys{$self->get_id()}) {
-        $existing = $keys{$self->get_id()};
+    if(exists $_keys{$self->get_id()}) {
+        $existing = $_keys{$self->get_id()};
         if($self->{protocol} < $existing->{protocol}) {
             $existing->{protocol} = $self->{protocol};
         }
     } else {
         $existing = $self;
-        $keys{$self->get_id()} = $self;
+        $_keys{$self->get_id()} = $self;
     }
     $existing->{origins}->{$self->{origin}} = 1
         if defined $self->{origin};
@@ -116,7 +191,7 @@ sub authorized_keys_fragment($$) {
 }
 
 # Set the strength of a key
-sub set_strength($) {
+sub _set_strength($) {
     # http://csrc.nist.gov/publications/nistpubs/800-57/sp800-57_part1_rev3_general.pdf
     my $self = shift;
     my $decoded = decode_base64($self->{keydata});
@@ -130,7 +205,7 @@ sub set_strength($) {
         my ($type, $e, $n) = unpack("l>/a l>/a l>/a", $decoded);
         $n =~ s/^\0*//;
         $self->{bits} = 8 * length($n);
-        $self->{strength} = prime_strength($self->{bits});
+        $self->{strength} = _prime_strength($self->{bits});
     } elsif($type eq 'ssh-dss') {
         $self->{type} = 'dsa';
         # DSA key format:
@@ -142,8 +217,8 @@ sub set_strength($) {
         my $lbits = 8 * length($p);
         my $nbits = 8 * length($q);
         $self->{bits} = $lbits;
-        my $lstrength = prime_strength($lbits);
-        my $nstrength = discrete_log_strength($nbits);
+        my $lstrength = _prime_strength($lbits);
+        my $nstrength = _discrete_log_strength($nbits);
         $self->{strength} = ($lstrength < $nstrength ? $lstrength
                              : $nstrength);
     } elsif($type =~ /^ecdsa-/) {
@@ -201,47 +276,12 @@ sub set_strength($) {
     }
 }
 
-# Get the ID of a key
-sub get_id($) {
-    my $self = shift;
-    die "Greenend::SSH::Key::get_id: key not initialized"
-        unless exists $self->{keydata};
-    # OpenSSH fingerprint format for protocol 2
-    my $d = Digest->new($fingerprint_hash);
-    $d->add(decode_base64($self->{keydata}));
-    return $d->hexdigest();
-}
-
-# Get a list of the places a key was found
-sub get_origins {
-    my $self = shift;
-    return sort keys %{$self->{origins}};
-}
-
-# Get a list of the names for this key
-sub get_names {
-    my $self = shift;
-    return sort keys %{$self->{names}};
-}
-
-# Get a list of accepting users
-sub get_accepting_users {
-    my $self = shift;
-    return _users(keys %{$self->{accepted_by}});
-}
-
-# Get a list of users who know this key
-sub get_knowing_users {
-    my $self = shift;
-    return _users(keys %{$self->{known_by}});
-}
-
 sub _users {
     return map($Greenend::SSH::User::users{$_}, @_);
 }
 
 # Returns the strength for a prime satisfying 2^($bits-1)<p<2^$bits
-sub prime_strength($) {
+sub _prime_strength($) {
     my $bits = shift;
     if($bits < 1024) {
         return 0;
@@ -259,53 +299,16 @@ sub prime_strength($) {
 }
 
 # Return the strength of a discrete log group with order 2^($bits-1)<q<2^$bits
-sub discrete_log_strength($) {
+sub _discrete_log_strength($) {
     my $bits = shift;
     return int($bits/2);
 }
 
-########################################################################
-
-# Get a key by ID
-sub get_by_id($) {
-    my $id = shift;
-    return $keys{$id};
-}
-
-# Get a list of all keys
-sub all_keys {
-    return map($keys{$_}, sort keys %keys);
-}
-
-# Critique the set of all keys
-sub critique {
-    my %args = @_;
-    $args{strength} = 128 unless exists $args{strength};
-    my @c = ();
-    for my $k (all_keys()) {
-        my @names = $k->get_names();
-        my @origins = $k->get_origins();
-        my @known_by = $k->get_knowing_users();
-        my @trouble = ();
-        push(@trouble, "  Key has multiple names") if @names > 1;
-        push(@trouble, "  Key is usable with protocol 1") if $k->{protocol} < 2;
-        push(@trouble,
-             "  Key ".$k->get_id()." is known by multiple users:",
-             map("    $_->{name}", @known_by)) if @known_by > 1;
-        push(@trouble, "  $k->{type} $k->{bits} key is too weak") if $k->{strength} < $args{strength};
-        if(@trouble) {
-            push(@c, "Trouble with key ".$k->get_id());
-            push(@c, @trouble);
-            push(@c, "  Names:",
-                 map("    $_", @names));
-            if(@origins > 0) {
-                push(@c,
-                     "  Origins:",
-                     map("    $_", @origins));
-            }
-        }
-    }
-    return @c;
+sub _hex_to_mpint($) {
+    local $_ = shift;
+    s/^(0x)?0*//i;
+    $_ = "00$_" if /^[90a-f]/i;
+    return pack("H*", $_);
 }
 
 return 1;
