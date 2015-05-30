@@ -19,6 +19,8 @@ use strict;
 use warnings;
 use POSIX;
 use MIME::Base64;
+use Greenend::SSH::Key;
+use Greenend::SSH::User;
 
 =head1 NAME
 
@@ -271,193 +273,26 @@ sub remoteFileExists($$) {
     return !system(@fullcmd);
 }
 
-# Parse a line from a pubkey or authorized keys file.
-sub parseKey($$$) {
-    my ($host, $line, $what) = @_;
-    my $k = parseKeyValue($line);
-    if(!defined $k
-       and $line =~ /^\s*([^\s\"]|\"([^\"]|\\\")*\")+\s+(.*)/) {
-        my $suffix = $3;
-        $k = parseKeyValue($suffix);
-    }
-    die "ERROR: $host has incomprehensible $what $line\n"
-        unless defined $k;
-    my $keyid = $k->{keyid};
-    for my $p ("strength", "bits", "type", "protocol") {
-        $info{$keyid}->{$p} = $k->{$p} if exists $k->{$p};
-    }
-    if(exists $k->{name}) {
-        if(exists $info{$keyid}->{name}
-           and $k->{name} ne $info{$keyid}->{name}) {
-            print STDERR "WARNING: key $info{$keyid}->{name} is also called $k->{name}\n";
-            $info{$keyid}->{multinamed} = 1;
-        } else {
-            $info{$keyid}->{name} = $k->{name};
-        }
-    }
-    $info{$keyid}->{serial} = $keySerial++ unless exists $info{$keyid}->{serial};
-    return $keyid;
-}
-
-# Parse the key part of a pubkey (i.e. not including any prior options).
-sub parseKeyValue($) {
-    my $line = shift;
-    if($line =~ /^\s*(\d+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+(.*)$/i) {
-        # 1: bits exponent modulus comment
-        return {
-            type => "rsa",
-            keyid => "$2-$3",
-            protocol => 1,
-            name => $4,
-            bits => $1,
-            strength => 0,     # protocol 1 assumed to be inherently broken
-        };
-    } elsif($line =~ /^\s*([a-z0-9\-]+)\s+([0-9a-z\+\/=]+)\s+(.*)$/i) {
-        # 2: type keydata comment
-        my ($strength, $bits) = keyStrength($2);
-        return  {
-            type => $1,
-            keyid => $2,
-            protocol => 2,
-            name => $3,
-            strength => $strength,
-            bits => $bits
-        };
-    } else {
-        return undef;
-    }
-}
-
-# Record the a host has a copy of a key
-sub hasKey($@) {
-    my ($host, @key) = @_;
-    for my $line (@key) {
-        my $keyid = parseKey($host, $line, "pubkey");
-        $has{$keyid}->{$host} = 1;
-    }
-}
-
 # Records that a host trusts a list of keys
 sub trustsKeys($@) {
-    my ($host, @keys) = @_;
+    my ($user, $origin, @keys) = @_;
+    my $lineno = 0;
     for my $line (@keys) {
+        ++$lineno;
         next if $line =~ /^(#.*|\s*)$/;
-        my $keyid = parseKey($host, $line, "key");
-        $trusts{$keyid}->{$host} = 1;
+        my $key = Greenend::SSH::Key->new(authorized_keys_line => $line,
+                                          origin => "$origin:$lineno");
+        $user->add_accepts_key($key);
         # TODO cope with conflicts
     }
 }
 
 # Construct the name for a key to display in the graph
 sub keyName($) {
-    my $keyid = shift;
-    my $name = ($info{$keyid}->{name} or $keyid);
+    my $key = shift;
+    my $name = $key->{name};
     $name =~ s/\Q$strip\E$// if defined $strip;
     return $name;
-}
-
-# Return the node ID for a key
-sub keyLabel($) {
-    my $keyid = shift;
-    return "k$info{$keyid}->{serial}";
-}
-
-# Returns the strength for a prime field with modulus 2^($bits-1)<p<2^$bits
-sub primeFieldStrength($) {
-    my $bits = shift;
-    if($bits < 1024) {
-        return (0, $bits);
-    } elsif($bits < 2048) {
-        return (80, $bits);
-    } elsif($bits < 3072) {
-        return (112, $bits);
-    } elsif($bits < 7680) {
-        return (128, $bits);
-    } elsif($bits < 15360) {
-        return (192, $bits);
-    } else {
-        return (256, $bits);
-    }
-}
-
-# Return the strength of a discrete log group with order 2^($bits-1)<q<2^$bits
-sub discreteLogStrength($) {
-    my $bits = shift;
-    return int($bits/2);
-}
-
-# Returns (strength, bits) for an SSH v2 public key
-#
-# http://csrc.nist.gov/publications/nistpubs/800-57/sp800-57_part1_rev3_general.pdf
-sub keyStrength($) {
-    my $decoded = decode_base64($_[0]);
-    # Data type representations:
-    #    http://tools.ietf.org/html/rfc4251#section-5
-    my $type = unpack("l>/a", $decoded);
-    if($type eq 'ssh-rsa') {
-        # RSA key format:
-        #    http://tools.ietf.org/html/rfc4253#section-6.6
-        my ($type, $e, $n) = unpack("l>/a l>/a l>/a", $decoded);
-        $n =~ s/^\0*//;
-        my $bits = 8 * length($n);
-        return (primeFieldStrength($bits), $bits);
-    } elsif($type eq 'ssh-dss') {
-        # DSA key format:
-        #    http://tools.ietf.org/html/rfc4253#section-6.6
-        my ($type, $p, $q, $g, $y) = unpack("l>/a l>/a l>/a l>/a l>/a",
-                                            $decoded);
-        $p =~ s/^\0*//;
-        $q =~ s/^\0*//;
-        my $lbits = 8 * length($p);
-        my $nbits = 8 * length($q);
-        my $lstrength = primeFieldStrength($lbits);
-        my $nstrength = discreteLogStrength($nbits);
-        return ($lstrength < $nstrength ? $lstrength : $nstrength, $lbits);
-    } elsif($type =~ /^ecdsa-/) {
-        my ($type, $domain, $q) = unpack("l>/a l>/a l>/a", $decoded);
-        # Key format:
-        #    http://tools.ietf.org/html/rfc5656#section-3.1
-        # Domain parameter IDs:
-        #    http://tools.ietf.org/html/rfc5656#section-10
-        # NIST recommended curves:
-        #    http://csrc.nist.gov/groups/ST/toolkit/documents/dss/NISTReCur.pdf
-        if($domain eq '1.2.840.10045.3.1.1') { # nistp192
-            return (80, 192);
-        } elsif($domain eq '1.3.132.0.33') { # nistp224
-            return (112, 224);
-        } elsif($domain eq 'nistp256') {
-            return (128, 256);
-        } elsif($domain eq 'nistp384') {
-            return (192, 384);
-        } elsif($domain eq 'nistp521') {
-            return (256, 521);
-        } elsif($domain eq '1.3.132.0.1') { # nistk163
-            return (80, 163);
-        } elsif($domain eq '1.3.132.0.26') { # nistb233
-            return (112, 233);
-        } elsif($domain eq '1.3.132.0.16') { # nistk283
-            return (128, 283);
-        } elsif($domain eq '1.3.132.0.36') { # nistk409
-            return (192, 409);
-        } elsif($domain eq '1.3.132.0.37') { # nistb409
-            return (192, 409);
-        } elsif($domain eq '1.3.132.0.38') { # nistt571
-            return (256, 571);
-        } else {
-            die "ERROR: unrecognized EC domain parameters $domain\n";
-        }
-    } elsif($type eq 'ssh-ed25519') {
-        # ed25519 keys are always 256 bits long
-        return (128, 256);
-    } else {
-        die "ERROR: unrecognized key type $type\n";
-    }
-}
-
-# Return true if a key is considered weak
-sub isWeak($) {
-    my $keyid = shift;
-    return $info{$keyid}->{strength} < $minStrength;
 }
 
 ## Parse command line
@@ -507,25 +342,27 @@ Options:
 die "ERROR: no hosts specified\n" unless @ARGV > 0 or $local;
 
 ## Read local keys and configuration
-
 if($local) {
     if(!defined $localName) {
         my @u = POSIX::uname();
         $localName = $u[1];
     }
     print STDERR "Checking $localName...\n" if $verbose;
-    for my $pubkey (<$ENV{HOME}/.ssh/*.pub>) {
-        my $privkey = privkey($pubkey);
-        if(defined $privkey && -e $privkey) {
-            print STDERR "  Key: $pubkey\n" if $verbose;
-            hasKey($localName, readLocalFile($pubkey));
+    my $localUser = Greenend::SSH::User->new(name => $localName);
+    for my $pubkeypath (<$ENV{HOME}/.ssh/*.pub>) {
+        my $pubkey = Greenend::SSH::Key->new(pub_key_file => $pubkeypath,
+                                             origin => $pubkeypath);
+        my $privkeypath = privkey($pubkeypath);
+        if(defined $privkeypath && -e $privkeypath) {
+            print STDERR "  Key: $pubkeypath\n" if $verbose;
+            $localUser->add_knows_key($pubkey);
         }
     }
     for my $ak (@ak) {
         my $file = "$ENV{HOME}/.ssh/$ak";
         if(-e $file) {
             print STDERR "  Authorized keys: $file\n" if $verbose;
-            trustsKeys($localName, readLocalFile($file));
+            trustsKeys($localUser, $file, readLocalFile($file));
         }
     }
     print STDERR "\n" if $verbose;
@@ -551,59 +388,32 @@ for my $host (@ARGV) {
         };
     }
     print STDERR "Checking $host...\n" if $verbose;
+    my $user = Greenend::SSH::User->new(name => $host);
     my @pubkeys = listRemoteFiles($host, ".ssh/*.pub");
-    for my $pubkey (listRemoteFiles($host, ".ssh/*.pub")) {
-        my $privkey = privkey($pubkey);
-        if(defined $privkey && remoteFileExists($host, $privkey)) {
-            print STDERR "  Key: $pubkey\n" if $verbose;
-            hasKey($host, readRemoteFile($host, $pubkey));
+    for my $pubkeypath (listRemoteFiles($host, ".ssh/*.pub")) {
+        my $privkeypath = privkey($pubkeypath);
+        if(defined $privkeypath && remoteFileExists($host, $privkeypath)) {
+            print STDERR "  Key: $pubkeypath\n" if $verbose;
+            my @pubkeyfile = readRemoteFile($host, $pubkeypath);
+            my $pubkey = Greenend::SSH::Key->new(authorized_keys_line => $pubkeyfile[0],
+                                                 origin => "$host:$pubkeypath");
+            $user->add_knows_key($pubkey);
         }
     }
     for my $ak (@ak) {
         my $file = ".ssh/$ak";
         if(remoteFileExists($host, $file)) {
             print STDERR "  Authorized keys: $file\n" if $verbose;
-            trustsKeys($host, readRemoteFile($host, $file));
+            trustsKeys($user, "$host:$file", readRemoteFile($host, $file));
         }
     }
     print STDERR "\n" if $verbose;
 }
 
-## Look for shared names
-
-my %hostsByName = ();           # hostsByName{HOST}->{...}
-my %keysByName = ();            # keysByName{NAME}->{KEYID} = 1
-for my $keyid (sort keys %info) {
-    $keysByName{$info{$keyid}->{name}}->{$keyid} = 1;
-    for my $host (keys %{$has{$keyid}}, keys %{$trusts{$keyid}}) {
-        $hostsByName{$host} = {};
-    }
-}
-for my $name (sort keys %keysByName) {
-    my @keyids = sort keys %{$keysByName{$name}};
-    if(@keyids > 1) {
-        print STDERR "WARNING: multiple keys have name $name\n";
-        for my $keyid (@keyids) {
-            my @trusters = sort keys %{$trusts{$keyid}};
-            print STDERR $keyid, " (", $info{$keyid}->{type};
-            if(@trusters > 0) {
-                print STDERR "; trusted by ", join(", ", @trusters);
-            } else {
-                print STDERR "; apparently unused";
-            }
-            print STDERR ")\n";
-            $info{$keyid}->{nameshare} = 1;
-        }
-        print STDERR "\n";
-    }
-}
-
-## Assign each host a serial number (for the node ID in the graph)
-
-my $hostSerial = 0;
-for my $host (sort keys %hostsByName) {
-    $hostsByName{$host}->{serial} = $hostSerial++;
-}
+# Report any problems found
+print STDERR map("$_\n",
+                 Greenend::SSH::Key::critique(strength => $minStrength),
+                 Greenend::SSH::User::critique(strength => $minStrength));
 
 ## Construct the graph
 
@@ -611,49 +421,24 @@ my @graph;
 push(@graph, "digraph \"ssh-graph\" {\n",
      "  graph [rankdir=LR];\n");
 
-## Identify trusters
-for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) {
-    my @trusters = keys %{$trusts{$keyid}};
-    $info{$keyid}->{trusters} = \@trusters;
-}
-
-## Identify which host knows which key
-for my $host (sort keys %hostsByName) {
-    $knows{$host} = []
-}
-for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %has) {
-    next unless @{$info{$keyid}->{trusters}} > 0 or $showUntrusted;
-    my @hosts = sort keys %{$has{$keyid}};
-    if(@hosts > 1) {
-        print STDERR "WARNING: multiple hosts have private key ", keyName($keyid), ": ",
-             join(", ", @hosts), "\n";
-        print STDERR "$keyid\n\n";
-    }
-    # For each host accumulate a list of the keys that it uniquely knows
-    if(@hosts == 1) {
-	my $host = $hosts[0];
-	push(@{$knows{$host}}, $keyid);
-    }
-    # TODO print a warning on stderr?
-}
-
 # Node data for hosts, in subgraphs
-for my $host (sort keys %hostsByName) {
-    my $serial = $hostsByName{$host}->{serial};
+for my $user (Greenend::SSH::User::all_users()) {
+    my $serial = $user->{serial};
+    my $name = $user->{name};
     my $p = "";
-    my @keys = @{$knows{$host}};
+    my @keys = $user->get_known_keys();
     if(@keys > 0 && $subgraphs) {
 	push(@graph, "  subgraph cluster_$serial {\n");
 	#push(@graph, "    color=black;\n");
 	$p = "  ";
     }
-    push(@graph, "$p  h$serial [label=\"$host\"];\n");
-    for my $keyid (@keys) {
-	my @hosts = sort keys %{$has{$keyid}};
-	if(@hosts == 1) {
-	    push(@graph, "$p  h$serial -> ", keyLabel($keyid),
-		 " [color=black];\n");
-	}
+    push(@graph, "$p  u$serial [label=\"$name\"];\n");
+    # For each key the user knows, an edge from user to key
+    for my $key (@keys) {
+        next unless $key->get_accepting_users() > 0 or $showUntrusted;
+        my @users = $key->get_knowing_users();
+        my $color = @users == 1 ? "black" : "blue";
+        push(@graph, "$p  u$serial -> k", $key->get_id(), " [color=$color];\n");
     }
     if(@keys > 0 && $subgraphs) {
 	push(@graph, "  }\n");
@@ -661,8 +446,8 @@ for my $host (sort keys %hostsByName) {
 }
 
 ## Node data for keys
-for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) {
-    my $weak = isWeak($keyid);
+for my $key (Greenend::SSH::Key::all_keys()) {
+    my $weak = $key->{strength} < $minStrength;
     my $fontcolor = "black";
     my $color = "black";
     my $fillcolor = "";
@@ -670,75 +455,32 @@ for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %info) 
         # Weak keys outlined in red
         $color = "red";
         # Weak keys that something trusts filled in red
-        if(@{$info{$keyid}->{trusters}} > 0) {
+        if($key->get_accepting_users() > 0) {
             $fillcolor = "red";
             $fontcolor = "white";
         }
-    } elsif(@{$info{$keyid}->{trusters}} == 0) {
+    } elsif($key->get_accepting_users() == 0) {
         # Non-weak keys that nothing trusts in grey
         $color = "grey";
         $fontcolor = "grey";
     }
-    next unless @{$info{$keyid}->{trusters}} > 0 or $showUntrusted;
+    next unless $key->get_accepting_users() > 0 or $showUntrusted;
     # Keys with multiple names in green (only one name is shown)
-    $fontcolor = "green" if $info{$keyid}->{multinamed};
+    $fontcolor = "green" if keys %{$key->{names}} > 1;
     # Keys which share names with other keys in blue
-    $fontcolor = "blue" if $info{$keyid}->{nameshare};
-    push(@graph, "  ", keyLabel($keyid),
-         " [label=\"", keyName($keyid), "|$info{$keyid}->{type}|$info{$keyid}->{strength} ($info{$keyid}->{bits}b)\",",
+    #$fontcolor = "blue" if $info{$keyid}->{nameshare}; ## TODO
+    push(@graph, "  k", $key->get_id(),
+         " [label=\"", keyName($key), "|$key->{type}|$key->{strength} ($key->{bits}b)\",",
          "shape=record,color=$color,fontcolor=$fontcolor");
     push(@graph, ",fillcolor=$fillcolor,style=filled") if $fillcolor ne '';
     push(@graph, "];\n");
-    # More detail warning to stderr for weak keys that something trusts
-    if($weak) {
-        for my $host (sort keys %{$trusts{$keyid}}) {
-            print STDERR "WARNING: $host trusts weak key ", keyName($keyid), "\n", $keyid, "\n\n";
-        }
-    }
-}
-
-## Keys known to more than one host
-for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %has) {
-    next unless @{$info{$keyid}->{trusters}} > 0 or $showUntrusted;
-    my @hosts = sort keys %{$has{$keyid}};
-    if(@hosts > 1) {
-	for my $host (@hosts) {
-	    my $color = "black";
-	    if(@hosts > 1) {
-		push(@graph, "  h$hostsByName{$host}->{serial} -> ", keyLabel($keyid),
-		     " [color=blue];\n");
-	    }
-	}
-    }
-}
-
-sub intersects {
-    my ($a, $b) = @_;
-    for my $k (keys %$a) {
-        return 1 if exists $$b{$k};
-    }
-    return 0;
-}
-
-## For each key that a host trusts, an edge from key to host
-
-for my $keyid (sort { $info{$a}->{serial} <=> $info{$b}->{serial} } keys %trusts) {
-    for my $host (sort keys %{$trusts{$keyid}}) {
+    ## For each key that a host trusts, an edge from key to host
+    for my $user ($key->get_accepting_users()) {
         my $color = "black";
         # Edges for multiple keys on the same host in green
-        for my $keyid2 (keys %trusts) {
-            if($keyid2 ne $keyid
-               and exists $trusts{$keyid2}->{$host}
-               and intersects($has{$keyid}, $has{$keyid2})) {
-                print STDERR "WARNING: $host can be reached from both $info{$keyid}->{name} and $info{$keyid2}->{name}\n"
-                    if $info{$keyid}->{serial} < $info{$keyid2}->{serial};
-                $color = "green";
-                last;
-            }
-        }
+        #TODO
         # Edges from weak keys in red
-        $color = "red" if isWeak($keyid);
-        push(@graph, "  ", keyLabel($keyid), " -> h$hostsByName{$host}->{serial} [color=$color];\n");
+        push(@graph, "  k", $key->get_id(), " -> u$user->{serial} [color=$color];\n");
     }
 }
 
