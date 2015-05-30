@@ -205,7 +205,7 @@ sub _set_strength($) {
         my ($type, $e, $n) = unpack("l>/a l>/a l>/a", $decoded);
         $n =~ s/^\0*//;
         $self->{bits} = 8 * length($n);
-        $self->{strength} = _prime_strength($self->{bits});
+        $self->{strength} = _nfs_strength($self->{bits});
     } elsif($type eq 'ssh-dss') {
         $self->{type} = 'dsa';
         # DSA key format:
@@ -217,7 +217,7 @@ sub _set_strength($) {
         my $lbits = 8 * length($p);
         my $nbits = 8 * length($q);
         $self->{bits} = $lbits;
-        my $lstrength = _prime_strength($lbits);
+        my $lstrength = _nfs_strength($lbits);
         my $nstrength = _discrete_log_strength($nbits);
         $self->{strength} = ($lstrength < $nstrength ? $lstrength
                              : $nstrength);
@@ -280,8 +280,9 @@ sub _users {
     return map($Greenend::SSH::User::_users{$_}, @_);
 }
 
-# Returns the strength for a prime satisfying 2^($bits-1)<p<2^$bits
-sub _prime_strength($) {
+# Returns the strength for a prime (DSA) or product (RSA) satisfying
+# 2^($bits-1)<p<2^$bits
+sub _nfs_strength($) {
     my $bits = shift;
     if($bits < 1024) {
         return 0;
