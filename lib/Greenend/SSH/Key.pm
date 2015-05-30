@@ -20,6 +20,8 @@ sub initialize {
     my $self = shift;
     $self->{known_by} = {};
     $self->{accepted_by} = {};
+    $self->{names} = {};
+    $self->{origins} = {};
     while(@_ > 0) {
         my $key = shift;
         my $value = shift;
@@ -27,6 +29,8 @@ sub initialize {
             $self->read_pub_key_file($value);
         } elsif($key eq 'authorized_keys_line') {
             $self->authorized_keys_line($value);
+        } elsif($key eq 'origin') {
+            $self->{origin} = $value;
         } else {
             die "Greenend::SSH::Key::initialize: unrecognized initialization key '$key'";
         }
@@ -86,7 +90,16 @@ sub authorized_keys_fragment($$) {
         $self->{e} =~ s/^(0x)?0*//i;
     }
     $self->set_strength();
-    $keys{$self->get_id()} = $self unless exists $keys{$self->get_id()};
+    my $existing;
+    if(exists $keys{$self->get_id()}) {
+        $existing = $keys{$self->get_id()};
+    } else {
+        $existing = $self;
+        $keys{$self->get_id()} = $self;
+    }
+    $existing->{origins}->{$self->{origin}} = 1
+        if defined $self->{origin};
+    $existing->{names}->{$self->{name}} = 1;
     return 1;
 }
 
@@ -196,6 +209,18 @@ sub get_id($) {
     }
 }
 
+# Get a list of the places a key was found
+sub get_origins {
+    my $self = shift;
+    return sort keys %{$self->{origin}};
+}
+
+# Get a list of the names for this key
+sub get_names {
+    my $self = shift;
+    return sort keys %{$self->{names}};
+}
+
 # Returns the strength for a prime field with modulus 2^($bits-1)<p<2^$bits
 sub prime_strength($) {
     my $bits = shift;
@@ -226,6 +251,7 @@ sub get_by_id($) {
     return $keys{$id};
 }
 
+# Get a list of all keys
 sub all_keys {
     return map($keys{$_}, sort keys %keys);
 }
