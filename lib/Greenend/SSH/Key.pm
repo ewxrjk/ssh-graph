@@ -38,7 +38,20 @@ sub initialize {
             die "Greenend::SSH::Key::initialize: unrecognized initialization key '$key'";
         }
     }
-    return $_keys{$self->get_id()};
+    my $existing;
+    if(exists $_keys{$self->get_id()}) {
+        $existing = $_keys{$self->get_id()};
+        if($self->{protocol} < $existing->{protocol}) {
+            $existing->{protocol} = $self->{protocol};
+        }
+    } else {
+        $existing = $self;
+        $_keys{$self->get_id()} = $self;
+    }
+    $existing->{origins}->{$self->{origin}} = 1
+        if defined $self->{origin};
+    $existing->{names}->{$self->{name}} = 1;
+    return $existing;
 }
 
 # Get the ID of a key
@@ -174,19 +187,6 @@ sub _authorized_keys_fragment($$) {
         return 0;
     }
     $self->_set_strength();
-    my $existing;
-    if(exists $_keys{$self->get_id()}) {
-        $existing = $_keys{$self->get_id()};
-        if($self->{protocol} < $existing->{protocol}) {
-            $existing->{protocol} = $self->{protocol};
-        }
-    } else {
-        $existing = $self;
-        $_keys{$self->get_id()} = $self;
-    }
-    $existing->{origins}->{$self->{origin}} = 1
-        if defined $self->{origin};
-    $existing->{names}->{$self->{name}} = 1;
     return 1;
 }
 
