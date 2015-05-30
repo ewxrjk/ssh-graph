@@ -2,7 +2,7 @@ use warnings;
 use strict;
 use Greenend::SSH::Key;
 use Greenend::SSH::User;
-use Test::Simple tests => 10;
+use Test::Simple tests => 16;
 
 my $u1 = Greenend::SSH::User->new(name => 'bob');
 my $u2 = Greenend::SSH::User->new(name => 'fred');
@@ -35,3 +35,20 @@ my @u2_accepted = $u2->get_accepted_keys();
 ok(@u1_accepted == 0);
 ok(@u2_accepted == 1);
 ok($u2_accepted[0] == $k1);
+
+my @critique = Greenend::SSH::User::critique();
+#print STDERR "\n", map("$_\n", @critique), "----\n";
+ok(@critique == 0);
+
+$u2->add_accepts_key($k2);
+@critique = Greenend::SSH::User::critique();
+#print STDERR "\n", map("$_\n", @critique), "----\n";
+my @expect = ('Trouble with user fred',
+              '  User fred can access fred using multiple keys:',
+              '    04c2aa02e11c78269526f3f67a7c436a (root@sfere)',
+              '    35dd6a606baf6692f59e31138898b0f8 (richard@araminta)');
+
+ok(@critique == scalar @expect);
+for my $n (0..$#expect) {
+    ok($critique[$n] eq $expect[$n]);
+}

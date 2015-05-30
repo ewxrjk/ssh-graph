@@ -46,6 +46,12 @@ sub get_known_keys {
     return _keys(keys %{$self->{known_keys}});
 }
 
+sub knows_keys {
+    my $self = shift;
+    my $key = shift;
+    return exists $self->{known_keys}->{$key->get_id()};
+}
+
 sub add_accepts_key {
     my $self = shift;
     my $key = shift;
@@ -59,10 +65,49 @@ sub get_accepted_keys {
     return _keys(keys %{$self->{accepts_keys}});
 }
 
+sub accepts_keys {
+    my $self = shift;
+    my $key = shift;
+    return exists $self->{accepts_keys}->{$key->get_id()};
+}
+
 ########################################################################
 
 sub all_users {
     return map($_users{$_}, sort keys %_users);
+}
+
+sub critique {
+    my %args = @_;
+    $args{strength} = 128 unless exists $args{strength};
+    my @c = ();
+    for my $u (all_users()) {
+        my @accepted_keys = $u->get_accepted_keys();
+        my %accepted_users = ();
+        my @trouble = ();
+        for my $k (@accepted_keys) {
+            for my $uu ($k->get_knowing_users()) {
+                $accepted_users{$uu->{id}} = 0
+                    unless exists $accepted_users{$uu->{id}};
+                $accepted_users{$uu->{id}} += 1;
+            }
+        }
+        for my $uuid (keys %accepted_users) {
+            if($accepted_users{$uuid} > 1) {
+                my $uu = $_users{$uuid};
+                push(@trouble, "  User $uu->{name} can access $u->{name} using multiple keys:");
+                for my $k (@accepted_keys) {
+                    if($uu->knows_keys($k)) {
+                        push(@trouble, "    ".$k->get_id." ($k->{name})");
+                    }
+                }
+            }
+        }
+        if(@trouble > 0) {
+            push(@c, "Trouble with user $u->{name}", @trouble);
+        }
+    }
+    return @c;
 }
 
 ########################################################################
