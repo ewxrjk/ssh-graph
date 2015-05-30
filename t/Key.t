@@ -1,7 +1,7 @@
 use warnings;
 use strict;
 use Greenend::SSH::Key;
-use Test::Simple tests => 50;
+use Test::Simple tests => 55;
 
 # Protocol version 1 
 my $k1 = Greenend::SSH::Key->new
@@ -83,11 +83,16 @@ ok($keys[3] == $k2);
 ok($keys[4] == $k1);
 
 my @critique = Greenend::SSH::Key::critique();
-ok(@critique == 6);
-ok($critique[0] eq "Key c04c3ed920121b5becc5b91927b2ece03c93496b has multiple names:");
-ok($critique[1] eq '  richard@araminta');
-ok($critique[2] eq '  whatever');
-ok($critique[3] eq 'Key c04c3ed920121b5becc5b91927b2ece03c93496b origins:');
+ok(@critique == 11, "actually ".scalar @critique);
+ok($critique[0] eq "Key c04c3ed920121b5becc5b91927b2ece03c93496b has multiple names");
+ok($critique[1] eq "Key c04c3ed920121b5becc5b91927b2ece03c93496b is usable with protocol 1");
+ok($critique[2] eq 'Key c04c3ed920121b5becc5b91927b2ece03c93496b names:');
+ok($critique[3] eq '  richard@araminta');
+ok($critique[4] eq '  whatever');
+ok($critique[5] eq 'Key c04c3ed920121b5becc5b91927b2ece03c93496b origins:');
 
-ok($critique[4] eq '  that');
-ok($critique[5] eq '  this');
+ok($critique[6] eq '  that');
+ok($critique[7] eq '  this');
+ok($critique[8] eq 'Key c3022b3cc12cae1616504a629794ac4c6aad7d38 is usable with protocol 1');
+ok($critique[9] eq 'Key c3022b3cc12cae1616504a629794ac4c6aad7d38 names:');
+ok($critique[10] eq '  root@sfere');

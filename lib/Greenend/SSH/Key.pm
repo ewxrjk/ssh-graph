@@ -93,6 +93,9 @@ sub authorized_keys_fragment($$) {
     my $existing;
     if(exists $keys{$self->get_id()}) {
         $existing = $keys{$self->get_id()};
+        if($self->{protocol} < $existing->{protocol}) {
+            $existing->{protocol} = $self->{protocol};
+        }
     } else {
         $existing = $self;
         $keys{$self->get_id()} = $self;
@@ -203,6 +206,8 @@ sub get_id($) {
     if($self->{type} eq 'rsa') {
         # Special-case RSA so that keys used with both protocol 1 and
         # 2 get the same ID.
+        # TODO better would be to repack SSH1 keys in SSH2 format,
+        # making the special-casing a bit less special.
         return sha1_hex("$self->{n}:$self->{e}");
     } else {
         return sha1_hex($self->{keydata});
@@ -237,7 +242,7 @@ sub _users {
     return map($Greenend::SSH::User::users{$_}, @_);
 }
 
-# Returns the strength for a prime field with modulus 2^($bits-1)<p<2^$bits
+# Returns the strength for a prime satisfying 2^($bits-1)<p<2^$bits
 sub prime_strength($) {
     my $bits = shift;
     if($bits < 1024) {
@@ -282,8 +287,12 @@ sub critique {
         my $trouble = 0;
         if(@names > 1) {
             push(@c,
-                 "Key ".$k->get_id()." has multiple names:",
-                 map("  $_", @names));
+                 "Key ".$k->get_id()." has multiple names");
+            ++$trouble;
+        }
+        if($k->{protocol} < 2) {
+            push(@c,
+                 "Key ".$k->get_id()." is usable with protocol 1");
             ++$trouble;
         }
         if(@known_by > 1) {
@@ -292,10 +301,14 @@ sub critique {
                  map("  $_->{name}", @known_by));
             ++$trouble;
         }
-        if($trouble and @origins > 0) {
-            push(@c,
-                 "Key ".$k->get_id()." origins:",
-                 map("  $_", @origins));
+        if($trouble) {
+            push(@c, "Key ".$k->get_id()." names:",
+                 map("  $_", @names));
+            if(@origins > 0) {
+                push(@c,
+                     "Key ".$k->get_id()." origins:",
+                     map("  $_", @origins));
+            }
         }
     }
     return @c;
