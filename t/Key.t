@@ -1,7 +1,7 @@
 use warnings;
 use strict;
 use Greenend::SSH::Key;
-use Test::Simple tests => 62;
+use Test::Simple tests => 60;
 
 # Protocol version 1 
 my $k1 = Greenend::SSH::Key->new
@@ -13,8 +13,7 @@ ok($k1->{protocol} == 1, "protocol should be 1, is $k1->{protocol}");
 ok($k1->{name} eq "root\@sfere", "name should be 'root\@sfere', is '$k1->{name}'");
 ok($k1->{bits} == 1024, "bits should be 1024, is $k1->{bits}");
 ok($k1->{strength} == 80, "strength should be 80, is $k1->{strength}");
-ok($k1->{e} eq '25', "public exponent should be (hex) 25, is $k1->{e}");
-ok($k1->get_id() eq 'c3022b3cc12cae1616504a629794ac4c6aad7d38', "id should be c3022b3cc12cae1616504a629794ac4c6aad7d38, is ".$k1->get_id());
+ok($k1->get_id() eq '04c2aa02e11c78269526f3f67a7c436a', "id should be 04c2aa02e11c78269526f3f67a7c436a, is ".$k1->get_id());
 
 # Protocol version 2: RSA
 my $k2 = Greenend::SSH::Key->new
@@ -26,15 +25,14 @@ ok($k2->{protocol} == 2, "protocol should be 2, is $k2->{protocol}");
 ok($k2->{name} eq "richard\@araminta", "name should be 'richard\@araminta', is '$k2->{name}'");
 ok($k2->{bits} == 2048, "bits should be 2048, is $k2->{bits}");
 ok($k2->{strength} == 112, "strength should be 112, is $k2->{strength}");
-ok($k2->{e} eq '23', "public exponent should be (hex) 23, is $k2->{e}");
-ok($k2->get_id() eq 'c04c3ed920121b5becc5b91927b2ece03c93496b', "id should be c04c3ed920121b5becc5b91927b2ece03c93496b, is ".$k2->get_id());
+ok($k2->get_id() eq '35dd6a606baf6692f59e31138898b0f8', "id should be 35dd6a606baf6692f59e31138898b0f8, is ".$k2->get_id());
 
 # Same key expressed in protocol 1 syntax
 my $k2a = Greenend::SSH::Key->new
     ('origin' => 'that',
      'authorized_keys_line'
      => "2048 35 24680595477525071228666633858974963585906849900974439839578949001692366606597465594249720474414183481002713560548983496180359661349390548247578966073578565758901345239741420806584897592905957641342654084126808544821100685977418731234538635643841034986124074900753190550499024384177037489585685752810877026168072619161557543447153927029641776563335582354757144867142251742199586137289279340716248862111939672028058138328638468944710937041913535022007325231825313139914727487113071915288479232035741967531919174623541376962435078203579995261966542129398869680459166135674190480851510272383972134434068010705926951655589 whatever");
-ok($k2a->get_id() eq 'c04c3ed920121b5becc5b91927b2ece03c93496b', "id should be c04c3ed920121b5becc5b91927b2ece03c93496b, is ".$k2a->get_id());
+ok($k2a->get_id() eq '35dd6a606baf6692f59e31138898b0f8', "id should be 35dd6a606baf6692f59e31138898b0f8, is ".$k2a->get_id());
 ok($k2 == $k2a);
 my @k2names = $k2->get_names();
 ok(@k2names == 2);
@@ -50,7 +48,7 @@ ok($k3->{protocol} == 2, "protocol should be 2, is $k3->{protocol}");
 ok($k3->{name} eq "root\@araminta", "name should be 'root\@araminta', is '$k3->{name}'");
 ok($k3->{bits} == 1024, "bits should be 1024, is $k3->{bits}");
 ok($k3->{strength} == 80, "strength should be 80, is $k3->{strength}");
-ok($k3->get_id() eq '68a87f52b45f43e8286596fe72a2de174b8db21f', "id should be 68a87f52b45f43e8286596fe72a2de174b8db21f, is ".$k3->get_id());
+ok($k3->get_id() eq '3034d1713a5a0b61d9f091f9dd606984', "id should be 3034d1713a5a0b61d9f091f9dd606984, is ".$k3->get_id());
 
 # Protocol version 2: ECDSA
 my $k4 = Greenend::SSH::Key->new
@@ -61,7 +59,7 @@ ok($k4->{protocol} == 2, "protocol should be 2, is $k4->{protocol}");
 ok($k4->{name} eq "richard\@araminta-ec256", "name should be 'richard\@araminta-ec256', is '$k4->{name}'");
 ok($k4->{bits} == 256, "bits should be 256, is $k4->{bits}");
 ok($k4->{strength} == 128, "strength should be 128, is $k4->{strength}");
-ok($k4->get_id() eq '5232e5b87ae305602de4d7af443d3b56e52d4eed', "id should be 5232e5b87ae305602de4d7af443d3b56e52d4eed, is ".$k4->get_id());
+ok($k4->get_id() eq '88870be2e50fab04442357051bcba335', "id should be 88870be2e50fab04442357051bcba335, is ".$k4->get_id());
 
 # Protocol version 2: ED25519
 my $k5 = Greenend::SSH::Key->new
@@ -72,34 +70,39 @@ ok($k5->{protocol} == 2, "protocol should be 2, is $k5->{protocol}");
 ok($k5->{name} eq "richard\@araminta-ed25519", "name should be 'richard\@araminta-ed25519', is '$k5->{name}'");
 ok($k5->{bits} == 256, "bits should be 256, is $k5->{bits}");
 ok($k5->{strength} == 128, "strength should be 128, is $k5->{strength}");
-ok($k5->get_id() eq '20d4f4595248c9c458e63737c3ab604507de8101', "id should be , is 20d4f4595248c9c458e63737c3ab604507de8101".$k5->get_id());
+ok($k5->get_id() eq 'bcf4459762d4d5dcb7938119aad0ce1a', "id should be bcf4459762d4d5dcb7938119aad0ce1a, is ".$k5->get_id());
 
 my @keys = Greenend::SSH::Key::all_keys();
+#print STDERR "\n", map($_->get_id()."\n", @keys);
 ok(@keys == 5);
-ok($keys[0] == $k5);
-ok($keys[1] == $k4);
-ok($keys[2] == $k3);
-ok($keys[3] == $k2);
-ok($keys[4] == $k1);
+ok($keys[0] == $k1);
+ok($keys[1] == $k3);
+ok($keys[2] == $k2);
+ok($keys[3] == $k4);
+ok($keys[4] == $k5);
 
 my @critique = Greenend::SSH::Key::critique(strength => 112);
 #print STDERR "\n", map("$_\n", @critique), "----\n";
-ok(@critique == 18, "actually ".scalar @critique);
-ok($critique[0]  eq 'Trouble with key 68a87f52b45f43e8286596fe72a2de174b8db21f');
-ok($critique[1]  eq '  dsa 1024 key is too weak');
-ok($critique[2]  eq '  Names:');
-ok($critique[3]  eq '    root@araminta');
-ok($critique[4]  eq "Trouble with key c04c3ed920121b5becc5b91927b2ece03c93496b");
-ok($critique[5]  eq "  Key has multiple names");
-ok($critique[6]  eq "  Key is usable with protocol 1");
-ok($critique[7]  eq '  Names:');
-ok($critique[8]  eq '    richard@araminta');
-ok($critique[9]  eq '    whatever');
-ok($critique[10] eq '  Origins:');
-ok($critique[11] eq '    that');
-ok($critique[12] eq '    this');
-ok($critique[13] eq 'Trouble with key c3022b3cc12cae1616504a629794ac4c6aad7d38');
-ok($critique[14] eq '  Key is usable with protocol 1');
-ok($critique[15] eq '  rsa 1024 key is too weak');
-ok($critique[16] eq '  Names:');
-ok($critique[17] eq '    root@sfere');
+my @expect = ('Trouble with key 04c2aa02e11c78269526f3f67a7c436a',
+              '  Key is usable with protocol 1',
+              '  rsa 1024 key is too weak',
+              '  Names:',
+              '    root@sfere',
+              'Trouble with key 3034d1713a5a0b61d9f091f9dd606984',
+              '  dsa 1024 key is too weak',
+              '  Names:',
+              '    root@araminta',
+              'Trouble with key 35dd6a606baf6692f59e31138898b0f8',
+              '  Key has multiple names',
+              '  Key is usable with protocol 1',
+              '  Names:',
+              '    richard@araminta',
+              '    whatever',
+              '  Origins:',
+              '    that',
+              '    this');
+
+ok(@critique == scalar @expect);
+for my $n (0..$#expect) {
+    ok($critique[$n] eq $expect[$n]);
+}

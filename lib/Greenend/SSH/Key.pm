@@ -3,11 +3,14 @@ use warnings;
 use strict;
 use IO::File;
 use MIME::Base64;
-use Digest::SHA qw(sha1_hex);
+use Digest;
 use Math::BigInt;
 
 # Map IDs to key structures
 our %keys = ();
+
+# Hash for key fingerprints (anything acceptable to Digest.pm will do)
+our $fingerprint_hash = "MD5";
 
 # new Greenend::SSH::Key(KEY=>VALUE, ...)
 sub new {
@@ -64,23 +67,28 @@ sub authorized_keys_line($$) {
     return $self;
 }
 
+sub hex_to_mpint($) {
+    local $_ = shift;
+    s/^(0x)?0*//i;
+    $_ = "00$_" if /^[90a-f]/i;
+    return pack("H*", $_);
+}
+
 sub authorized_keys_fragment($$) {
     my $self = shift;
     local $_ = shift;
     if(/^\s*(\d+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+(.*)$/i) {
         # 1: bits exponent modulus comment
         $self->{type} = "rsa";
-        $self->{n} = (new Math::BigInt($3))->as_hex();
-        $self->{e} = (new Math::BigInt($2))->as_hex();
+        my $n = (new Math::BigInt($3))->as_hex();
+        my $e = (new Math::BigInt($2))->as_hex();
         $self->{protocol} = 1;
         $self->{name} = $4;
         $self->{bits} = $1;
-        $self->{n} =~ s/^(0x)?0*//i;
-        $self->{e} =~ s/^(0x)?0*//i;
         $self->{keydata} = encode_base64(pack("l>/a l>/a l>/a",
                                               "ssh-rsa",
-                                              pack("H*", $self->{e}),
-                                              pack("H*", $self->{n})));
+                                              hex_to_mpint($e),
+                                              hex_to_mpint($n)));
     } elsif(/^\s*([a-z0-9\-]+)\s+([0-9a-z\+\/=]+)\s+(.*)$/i) {
         # 2: type keydata comment
         $self->{type} = $1;
@@ -122,10 +130,6 @@ sub set_strength($) {
         my ($type, $e, $n) = unpack("l>/a l>/a l>/a", $decoded);
         $n =~ s/^\0*//;
         $self->{bits} = 8 * length($n);
-        $self->{n} = unpack("H*", $n);
-        $self->{e} = unpack("H*", $e);
-        $self->{n} =~ s/^(0x)?0*//i;
-        $self->{e} =~ s/^(0x)?0*//i;
         $self->{strength} = prime_strength($self->{bits});
     } elsif($type eq 'ssh-dss') {
         $self->{type} = 'dsa';
@@ -202,16 +206,10 @@ sub get_id($) {
     my $self = shift;
     die "Greenend::SSH::Key::get_id: key not initialized"
         unless exists $self->{keydata};
-    # TODO use the OpenSSH key fingerprint, duh.
-    if($self->{type} eq 'rsa') {
-        # Special-case RSA so that keys used with both protocol 1 and
-        # 2 get the same ID.
-        # TODO better would be to repack SSH1 keys in SSH2 format,
-        # making the special-casing a bit less special.
-        return sha1_hex("$self->{n}:$self->{e}");
-    } else {
-        return sha1_hex($self->{keydata});
-    }
+    # OpenSSH fingerprint format for protocol 2
+    my $d = Digest->new($fingerprint_hash);
+    $d->add(decode_base64($self->{keydata}));
+    return $d->hexdigest();
 }
 
 # Get a list of the places a key was found
@@ -265,6 +263,8 @@ sub discrete_log_strength($) {
     my $bits = shift;
     return int($bits/2);
 }
+
+########################################################################
 
 # Get a key by ID
 sub get_by_id($) {

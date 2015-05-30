@@ -26,8 +26,8 @@ my @u2_known = $u2->get_known_keys();
 ok(@u1_known == 1);
 ok($u1_known[0] eq $k1);
 ok(@u2_known == 2);
-ok($u2_known[0] == $k2);
-ok($u2_known[1] == $k1);
+ok($u2_known[0] == $k1);
+ok($u2_known[1] == $k2);
 
 $u2->add_accepts_key($k1);
 my @u1_accepted = $u1->get_accepted_keys();
