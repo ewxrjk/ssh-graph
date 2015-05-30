@@ -224,4 +224,8 @@ sub get_by_id($) {
     return $keys{$id};
 }
 
+sub all_keys {
+    return map($keys{$_}, sort keys %keys);
+}
+
 return 1;
