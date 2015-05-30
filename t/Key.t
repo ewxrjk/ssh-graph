@@ -1,7 +1,7 @@
 use warnings;
 use strict;
 use Greenend::SSH::Key;
-use Test::Simple tests => 55;
+use Test::Simple tests => 62;
 
 # Protocol version 1 
 my $k1 = Greenend::SSH::Key->new
@@ -82,17 +82,24 @@ ok($keys[2] == $k3);
 ok($keys[3] == $k2);
 ok($keys[4] == $k1);
 
-my @critique = Greenend::SSH::Key::critique();
-ok(@critique == 11, "actually ".scalar @critique);
-ok($critique[0] eq "Key c04c3ed920121b5becc5b91927b2ece03c93496b has multiple names");
-ok($critique[1] eq "Key c04c3ed920121b5becc5b91927b2ece03c93496b is usable with protocol 1");
-ok($critique[2] eq 'Key c04c3ed920121b5becc5b91927b2ece03c93496b names:');
-ok($critique[3] eq '  richard@araminta');
-ok($critique[4] eq '  whatever');
-ok($critique[5] eq 'Key c04c3ed920121b5becc5b91927b2ece03c93496b origins:');
-
-ok($critique[6] eq '  that');
-ok($critique[7] eq '  this');
-ok($critique[8] eq 'Key c3022b3cc12cae1616504a629794ac4c6aad7d38 is usable with protocol 1');
-ok($critique[9] eq 'Key c3022b3cc12cae1616504a629794ac4c6aad7d38 names:');
-ok($critique[10] eq '  root@sfere');
+my @critique = Greenend::SSH::Key::critique(strength => 112);
+#print STDERR "\n", map("$_\n", @critique), "----\n";
+ok(@critique == 18, "actually ".scalar @critique);
+ok($critique[0]  eq 'Trouble with key 68a87f52b45f43e8286596fe72a2de174b8db21f');
+ok($critique[1]  eq '  dsa 1024 key is too weak');
+ok($critique[2]  eq '  Names:');
+ok($critique[3]  eq '    root@araminta');
+ok($critique[4]  eq "Trouble with key c04c3ed920121b5becc5b91927b2ece03c93496b");
+ok($critique[5]  eq "  Key has multiple names");
+ok($critique[6]  eq "  Key is usable with protocol 1");
+ok($critique[7]  eq '  Names:');
+ok($critique[8]  eq '    richard@araminta');
+ok($critique[9]  eq '    whatever');
+ok($critique[10] eq '  Origins:');
+ok($critique[11] eq '    that');
+ok($critique[12] eq '    this');
+ok($critique[13] eq 'Trouble with key c3022b3cc12cae1616504a629794ac4c6aad7d38');
+ok($critique[14] eq '  Key is usable with protocol 1');
+ok($critique[15] eq '  rsa 1024 key is too weak');
+ok($critique[16] eq '  Names:');
+ok($critique[17] eq '    root@sfere');

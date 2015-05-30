@@ -203,6 +203,7 @@ sub get_id($) {
     my $self = shift;
     die "Greenend::SSH::Key::get_id: key not initialized"
         unless exists $self->{keydata};
+    # TODO use the OpenSSH key fingerprint, duh.
     if($self->{type} eq 'rsa') {
         # Special-case RSA so that keys used with both protocol 1 and
         # 2 get the same ID.
@@ -279,35 +280,29 @@ sub all_keys {
 
 # Critique the set of all keys
 sub critique {
+    my %args = @_;
+    $args{strength} = 128 unless exists $args{strength};
     my @c = ();
     for my $k (all_keys()) {
         my @names = $k->get_names();
         my @origins = $k->get_origins();
         my @known_by = $k->get_knowing_users();
-        my $trouble = 0;
-        if(@names > 1) {
-            push(@c,
-                 "Key ".$k->get_id()." has multiple names");
-            ++$trouble;
-        }
-        if($k->{protocol} < 2) {
-            push(@c,
-                 "Key ".$k->get_id()." is usable with protocol 1");
-            ++$trouble;
-        }
-        if(@known_by > 1) {
-            push(@c,
-                 "Key ".$k->get_id()." is known by multiple users:",
-                 map("  $_->{name}", @known_by));
-            ++$trouble;
-        }
-        if($trouble) {
-            push(@c, "Key ".$k->get_id()." names:",
-                 map("  $_", @names));
+        my @trouble = ();
+        push(@trouble, "  Key has multiple names") if @names > 1;
+        push(@trouble, "  Key is usable with protocol 1") if $k->{protocol} < 2;
+        push(@trouble,
+             "  Key ".$k->get_id()." is known by multiple users:",
+             map("    $_->{name}", @known_by)) if @known_by > 1;
+        push(@trouble, "  $k->{type} $k->{bits} key is too weak") if $k->{strength} < $args{strength};
+        if(@trouble) {
+            push(@c, "Trouble with key ".$k->get_id());
+            push(@c, @trouble);
+            push(@c, "  Names:",
+                 map("    $_", @names));
             if(@origins > 0) {
                 push(@c,
-                     "Key ".$k->get_id()." origins:",
-                     map("  $_", @origins));
+                     "  Origins:",
+                     map("    $_", @origins));
             }
         }
     }
