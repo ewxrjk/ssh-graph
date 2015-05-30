@@ -1,7 +1,7 @@
 use warnings;
 use strict;
 use Greenend::SSH::Key;
-use Test::Simple tests => 43;
+use Test::Simple tests => 50;
 
 # Protocol version 1 
 my $k1 = Greenend::SSH::Key->new
@@ -18,7 +18,8 @@ ok($k1->get_id() eq 'c3022b3cc12cae1616504a629794ac4c6aad7d38', "id should be c3
 
 # Protocol version 2: RSA
 my $k2 = Greenend::SSH::Key->new
-    ('authorized_keys_line'
+    ('origin' => 'this',
+     'authorized_keys_line'
      => 'ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAw4IKtGiqHBOfPp1VW9ZF8vD6tOa6r46iwR9neok10hbEG4bp+Yljof25dUWJoTXLUkqk4h48h4A+vojkVbvWldw61xwefmTAVW7UKt0kVwHlDNBYxAf1P1KvWaU96XOwtT9s3dG75auWadnN39wDbrVL/ZMr4NSekju0PTq2h9rPJN6X2NLxM7/z82Grkz4FbT3isB4Kyhn+IJ89KepGGJG91s3dUwiC0VpYOqiAwPz9RExwutpdI4rNqoy51swAiQfnIV7fSxekj7Mv/Jbhsbt0khhgAOOj1D+lCHlbatQNBKDorXulv3HwXXfnyWW3Tqg8XirvjJbUw69ApMHYpQ== richard@araminta');
 ok($k2->{type} eq "rsa", "type should be 'rsa', is '$k2->{type}'");
 ok($k2->{protocol} == 2, "protocol should be 2, is $k2->{protocol}");
@@ -30,7 +31,8 @@ ok($k2->get_id() eq 'c04c3ed920121b5becc5b91927b2ece03c93496b', "id should be c0
 
 # Same key expressed in protocol 1 syntax
 my $k2a = Greenend::SSH::Key->new
-    ('authorized_keys_line'
+    ('origin' => 'that',
+     'authorized_keys_line'
      => "2048 35 24680595477525071228666633858974963585906849900974439839578949001692366606597465594249720474414183481002713560548983496180359661349390548247578966073578565758901345239741420806584897592905957641342654084126808544821100685977418731234538635643841034986124074900753190550499024384177037489585685752810877026168072619161557543447153927029641776563335582354757144867142251742199586137289279340716248862111939672028058138328638468944710937041913535022007325231825313139914727487113071915288479232035741967531919174623541376962435078203579995261966542129398869680459166135674190480851510272383972134434068010705926951655589 whatever");
 ok($k2a->get_id() eq 'c04c3ed920121b5becc5b91927b2ece03c93496b', "id should be c04c3ed920121b5becc5b91927b2ece03c93496b, is ".$k2a->get_id());
 ok($k2 == $k2a);
@@ -79,3 +81,13 @@ ok($keys[1] == $k4);
 ok($keys[2] == $k3);
 ok($keys[3] == $k2);
 ok($keys[4] == $k1);
+
+my @critique = Greenend::SSH::Key::critique();
+ok(@critique == 6);
+ok($critique[0] eq "Key c04c3ed920121b5becc5b91927b2ece03c93496b has multiple names:");
+ok($critique[1] eq '  richard@araminta');
+ok($critique[2] eq '  whatever');
+ok($critique[3] eq 'Key c04c3ed920121b5becc5b91927b2ece03c93496b origins:');
+
+ok($critique[4] eq '  that');
+ok($critique[5] eq '  this');

@@ -212,13 +212,29 @@ sub get_id($) {
 # Get a list of the places a key was found
 sub get_origins {
     my $self = shift;
-    return sort keys %{$self->{origin}};
+    return sort keys %{$self->{origins}};
 }
 
 # Get a list of the names for this key
 sub get_names {
     my $self = shift;
     return sort keys %{$self->{names}};
+}
+
+# Get a list of accepting users
+sub get_accepting_users {
+    my $self = shift;
+    return _users(keys %{$self->{accepted_by}});
+}
+
+# Get a list of users who know this key
+sub get_knowing_users {
+    my $self = shift;
+    return _users(keys %{$self->{known_by}});
+}
+
+sub _users {
+    return map($Greenend::SSH::User::users{$_}, @_);
 }
 
 # Returns the strength for a prime field with modulus 2^($bits-1)<p<2^$bits
@@ -254,6 +270,35 @@ sub get_by_id($) {
 # Get a list of all keys
 sub all_keys {
     return map($keys{$_}, sort keys %keys);
+}
+
+# Critique the set of all keys
+sub critique {
+    my @c = ();
+    for my $k (all_keys()) {
+        my @names = $k->get_names();
+        my @origins = $k->get_origins();
+        my @known_by = $k->get_knowing_users();
+        my $trouble = 0;
+        if(@names > 1) {
+            push(@c,
+                 "Key ".$k->get_id()." has multiple names:",
+                 map("  $_", @names));
+            ++$trouble;
+        }
+        if(@known_by > 1) {
+            push(@c,
+                 "Key ".$k->get_id()." is known by multiple users:",
+                 map("  $_->{name}", @known_by));
+            ++$trouble;
+        }
+        if($trouble and @origins > 0) {
+            push(@c,
+                 "Key ".$k->get_id()." origins:",
+                 map("  $_", @origins));
+        }
+    }
+    return @c;
 }
 
 return 1;
