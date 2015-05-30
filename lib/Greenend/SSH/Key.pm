@@ -127,11 +127,11 @@ sub critique {
 sub _read_pub_key_file($$) {
     my $self = shift;
     my $path = shift;
-    my $f = IO::File::new($path, "r");
+    my $f = IO::File->new($path, "r");
     die "ERROR: $path: $!\n" unless $f;
     my $line = <$f>;
     $f->close();
-    return $self->authorized_keys_line($line);
+    return $self->_authorized_keys_line($line);
 }
 
 # Read one line in an OpenSSH authorized_keys file
