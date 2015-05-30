@@ -3,7 +3,6 @@ use Greenend::SSH::Key;
 use warnings;
 use strict;
 
-our $_next_id = 0;
 our %_users = ();
 
 # new Greenend::SSH::User(KEY=>VALUE, ...)
@@ -17,8 +16,6 @@ sub initialize {
     my $self = shift;
     $self->{known_keys} = {};
     $self->{accepts_keys} = {};
-    $self->{id} = ++$_next_id;
-    $_users{$self->{id}} = $self;
     while(@_ > 0) {
         my $key = shift;
         my $value = shift;
@@ -30,6 +27,10 @@ sub initialize {
     }
     die "Greenend::SSH::Key::get_id: key not initialized"
         unless exists $self->{name};
+    if(exists $_users{$self->{name}}) {
+        return $_users{$self->{name}};
+    }
+    $_users{$self->{name}} = $self;
     return $self;
 }
 
@@ -37,7 +38,7 @@ sub add_knows_key {
     my $self = shift;
     my $key = shift;
     $self->{known_keys}->{$key->get_id()} = 1;
-    $key->{known_by}->{$self->{id}} = 1;
+    $key->{known_by}->{$self->{name}} = 1;
     return $self;
 }
 
@@ -56,7 +57,7 @@ sub add_accepts_key {
     my $self = shift;
     my $key = shift;
     $self->{accepts_keys}->{$key->get_id()} = 1;
-    $key->{accepted_by}->{$self->{id}} = 1;
+    $key->{accepted_by}->{$self->{name}} = 1;
     return $self;
 }
 
@@ -87,9 +88,9 @@ sub critique {
         my @trouble = ();
         for my $k (@accepted_keys) {
             for my $uu ($k->get_knowing_users()) {
-                $accepted_users{$uu->{id}} = 0
-                    unless exists $accepted_users{$uu->{id}};
-                $accepted_users{$uu->{id}} += 1;
+                $accepted_users{$uu->{name}} = 0
+                    unless exists $accepted_users{$uu->{name}};
+                $accepted_users{$uu->{name}} += 1;
             }
         }
         for my $uuid (keys %accepted_users) {
