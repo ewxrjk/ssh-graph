@@ -277,7 +277,7 @@ sub _set_strength($) {
 }
 
 sub _users {
-    return map($Greenend::SSH::User::users{$_}, @_);
+    return map($Greenend::SSH::User::_users{$_}, @_);
 }
 
 # Returns the strength for a prime satisfying 2^($bits-1)<p<2^$bits
