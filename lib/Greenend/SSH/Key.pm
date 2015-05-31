@@ -47,11 +47,21 @@ our $fingerprint_hash = "MD5";
 =head1 CONSTRUCTOR
 
   $key = Greenend::SSH::Key->new(pub_key_file => PATH);
-  $key = Greenend::SSH::Key->new(authorize_keys_line => LINE,
-                                 origin => FILENAME);
 
-Creates a key object either from a B<.pub> file or from a line found
-in an B<authorized_keys> file.
+Creates a key object either from a B<.pub> file.
+
+  $key = Greenend::SSH::Key->new(origin => FILENAME,
+                                 authorized_keys_line => LINE);
+
+Creates a key object from a line found in an B<authorized_keys> file.
+
+  $key = Greenend::SSH::Key->new(origin => FILENAME,
+                                 keyblob => DATA,
+                                 name => NAME);
+
+Creates a key object from raw data.  B<DATA> must consist of the key
+name followed by the base64 key data.  B<NAME> is optional; if no name
+is supplied then the key fingerprint is used.
 
 As well as recording the value of the key this also records the name
 of the key and, optionally, the origin.
@@ -84,14 +94,19 @@ sub initialize {
             $self->_read_pub_key_file($value);
         } elsif($key eq 'authorized_keys_line') {
             $self->_authorized_keys_line($value);
+        } elsif($key eq 'keyblob') {
+            $self->_keyblob($value);
+        } elsif($key eq 'name') {
+            $self->{name} = $value;
         } elsif($key eq 'origin') {
             $self->{origin} = $value;
         } else {
-            die "Greenend::SSH::Key::initialize: unrecognized initialization key '$key'";
+            die "$self->{origin}: Greenend::SSH::Key::initialize: unrecognized initialization key '$key'";
         }
     }
     die "$self->{origin}: Greenend::SSH::Key::initialize: keydata not set"
         unless exists $self->{keydata};
+    $self->{name} = $self->get_id() unless exists $self->{name};
     $_keys_by_name{$self->{name}}->{$self->get_id()} = 1;
     my $existing;
     if(exists $_keys{$self->get_id()}) {
@@ -429,6 +444,20 @@ sub _public_key_text($$) {
         $self->{keydata} = $2;
         $self->{protocol} = 2;
         $self->{name} = $3;
+    } else {
+        return 0;
+    }
+    $self->_set_strength();
+    return 1;
+}
+
+sub _keyblob($$) {
+    my $self = shift;
+    local $_ = shift;
+    if(/^\s*([a-z0-9\-]+)\s+([0-9a-z\+\/=]+)$/i) {
+        $self->{type} = $1;
+        $self->{keydata} = $2;
+        $self->{protocol} = 2;
     } else {
         return 0;
     }

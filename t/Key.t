@@ -18,7 +18,7 @@
 use warnings;
 use strict;
 use Greenend::SSH::Key;
-use Test::Simple tests => 78;
+use Test::Simple tests => 81;
 
 # Protocol version 1 
 my $k1 = Greenend::SSH::Key->new
@@ -102,14 +102,21 @@ ok(@ks == 2);
 ok($ks[0] == $k2);
 ok($ks[1] == $k5);
 
+my $k6 = Greenend::SSH::Key->new
+    ('keyblob'
+     => "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEVvTK0Ra28YSULIuQjcOATUFJCq3sQ4zysi7NgpJeL5");
+ok($k6->get_id() eq 'f94728f2fb76f3abeac1e8a5b81883b1');
+ok($k6->{name} eq 'f94728f2fb76f3abeac1e8a5b81883b1');
+
 my @keys = Greenend::SSH::Key::all_keys();
 #print STDERR "\n", map($_->get_id()."\n", @keys);
-ok(@keys == 5);
+ok(@keys == 6);
 ok($keys[0] == $k1);
 ok($keys[1] == $k3);
 ok($keys[2] == $k2);
 ok($keys[3] == $k4);
 ok($keys[4] == $k5);
+ok($keys[5] == $k6);
 
 my @critique = Greenend::SSH::Key::critique(strength => 112);
 #print STDERR "\n", map("$_\n", @critique), "----\n";
