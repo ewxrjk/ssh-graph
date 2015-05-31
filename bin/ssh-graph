@@ -478,15 +478,8 @@ for my $key (Greenend::SSH::Key::all_keys()) {
         my $color = "black";
         # If a user can access this user via multiple keys, color the
         # edge green
-        my $keys = 0;
-        for my $uu ($key->get_knowing_users()) {
-            for my $kk ($uu->get_known_keys()) {
-                if($user->accepts_key($kk)) {
-                    ++$keys;
-                }
-            }
-        }
-        $color = 'green' if $keys > 1;
+        $color = 'green'
+            if exists $key->{issues}->{multiple_paths}->{$user->{name}};
         # Edges from weak keys in red
         $color = 'red' if $key->{strength} < $minStrength;
         push(@graph, "  k", $key->get_id(), " -> u$user->{serial} [color=$color];\n");

@@ -104,6 +104,7 @@ sub critique {
                 for my $k (@accepted_keys) {
                     if($uu->knows_key($k)) {
                         push(@trouble, "    ".$k->get_id." ($k->{name})");
+                        $k->{issues}->{multiple_paths}->{$u->{name}} = 1;
                     }
                 }
             }
