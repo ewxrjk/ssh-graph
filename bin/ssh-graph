@@ -71,6 +71,10 @@ Show keys that nothing trusts.  This is the default.
 Don't show keys that nothing trusts.
 Note that this hides even weak keys.
 
+=item B<--connect> [I<USER1>B<@>]I<HOST1> [I<USER1>B<@>]I<HOST2>
+
+Include a dotted edge from I<HOST1> to I<HOST2>.
+
 =item B<--verbose>
 
 Print progress messages to standard error.
@@ -214,6 +218,7 @@ our $strip;             # suffix to strip from key names
 our $minStrength = 112; # minimum security strength
 our $showUntrusted = 1; # --show-untrusted
 our $subgraphs = 0;	# use subgraph clusters (not pretty...)
+our @connect_extra = ();# extra connections
 
 # Convert the filename of a public key to the filename of the assumed
 # corresponding private key.
@@ -301,6 +306,8 @@ while(@ARGV > 0 and $ARGV[0] =~ /^-/) {
 Options:
   --no-local            Don't include local .ssh
   --local NAME          Read local .ssh, local host is NAME
+  --connect [USER1@]HOST1 [USER2@]HOST2
+                        Connect HOST1 to HOST2
   --verbose             Verbose operation
   --strip SUFFIX        Suffix to strip from key names
   --strength BITS       Minimum SP800-57 security strength
@@ -317,6 +324,11 @@ Options:
     } elsif($opt eq "--local") {
         $local = 1;
         $localName = shift;
+    } elsif($opt eq "--connect") {
+        my $h1 = shift;
+        my $h2 = shift;
+        push(@connect_extra, [Greenend::SSH::User->new(name => $h1),
+                              Greenend::SSH::User->new(name => $h2)]);
     } elsif($opt eq "--verbose") {
         $verbose = 1;
     } elsif($opt eq "--strip") {
@@ -438,6 +450,12 @@ for my $user (Greenend::SSH::User::all_users()) {
     if(@keys > 0 && $subgraphs) {
 	push(@graph, "  }\n");
     }
+}
+
+for my $pair (@connect_extra) {
+    my $user1 = $pair->[0];
+    my $user2 = $pair->[1];
+    push(@graph, "  u$user1->{serial} -> u$user2->{serial} [style=dotted];\n");
 }
 
 ## Node data for keys
