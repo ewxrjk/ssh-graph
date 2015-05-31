@@ -25,7 +25,7 @@ use Math::BigInt;
 
 Greenend::SSH::Key - Information about an SSH public key
 
-=head1 SYNSOPSIS
+=head1 SYNOPSIS
 
 B<use Greenend::SSH::Key;>
 

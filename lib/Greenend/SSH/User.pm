@@ -22,7 +22,7 @@ use strict;
 
 Greenend::SSH::User - Information about a user of SSH
 
-=head1 SYNSOPSIS
+=head1 SYNOPSIS
 
 B<use Greenend::SSH::User;>
 
