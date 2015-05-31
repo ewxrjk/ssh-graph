@@ -49,6 +49,7 @@ sub initialize {
         my $value = shift;
         if($key eq 'pub_key_file') {
             $self->_read_pub_key_file($value);
+            # TODO set origin
         } elsif($key eq 'authorized_keys_line') {
             $self->_authorized_keys_line($value);
         } elsif($key eq 'origin') {
