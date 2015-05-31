@@ -75,6 +75,11 @@ Note that this hides even weak keys.
 
 Include a dotted edge from I<HOST1> to I<HOST2>.
 
+=item B<--connect-root>
+
+Include a dotted edge from B<root@>I<HOST> to all other users on
+I<HOST>.
+
 =item B<--verbose>
 
 Print progress messages to standard error.
@@ -218,6 +223,7 @@ our $strip;             # suffix to strip from key names
 our $minStrength = 112; # minimum security strength
 our $showUntrusted = 1; # --show-untrusted
 our $subgraphs = 0;	# use subgraph clusters (not pretty...)
+our $connect_root = 0;  # auto-connect root@
 our @connect_extra = ();# extra connections
 
 # Convert the filename of a public key to the filename of the assumed
@@ -308,6 +314,7 @@ Options:
   --local NAME          Read local .ssh, local host is NAME
   --connect [USER1@]HOST1 [USER2@]HOST2
                         Connect HOST1 to HOST2
+  --connect-root        Auto-connect root@...
   --verbose             Verbose operation
   --strip SUFFIX        Suffix to strip from key names
   --strength BITS       Minimum SP800-57 security strength
@@ -329,6 +336,8 @@ Options:
         my $h2 = shift;
         push(@connect_extra, [Greenend::SSH::User->new(name => $h1),
                               Greenend::SSH::User->new(name => $h2)]);
+    } elsif($opt eq "--connect-root") {
+        $connect_root = 1;
     } elsif($opt eq "--verbose") {
         $verbose = 1;
     } elsif($opt eq "--strip") {
@@ -449,6 +458,20 @@ for my $user (Greenend::SSH::User::all_users()) {
     }
     if(@keys > 0 && $subgraphs) {
 	push(@graph, "  }\n");
+    }
+}
+
+if($connect_root) {
+    for my $user (Greenend::SSH::User::all_users()) {
+        if($user->{name} =~ /^root\@(.*)$/) {
+            my $host = $1;
+            my @mortals = grep($_ != $user
+                               && ($_->{name} =~ m/^(.*\@)?\Q$host\E$/),
+                               Greenend::SSH::User::all_users());
+            for my $mortal (@mortals) {
+                push(@graph, "  u$user->{serial} -> u$mortal->{serial} [style=dotted];\n");
+            }
+        }
     }
 }
 
