@@ -9,6 +9,9 @@ use Math::BigInt;
 # Map IDs to key structures
 our %_keys = ();
 
+# Map name to dict of IDs
+our %_keys_by_name = ();
+
 # Hash for key fingerprints (anything acceptable to Digest.pm will do)
 our $fingerprint_hash = "MD5";
 
@@ -38,6 +41,7 @@ sub initialize {
             die "Greenend::SSH::Key::initialize: unrecognized initialization key '$key'";
         }
     }
+    $_keys_by_name{$self->{name}}->{$self->get_id()} = 1;
     my $existing;
     if(exists $_keys{$self->get_id()}) {
         $existing = $_keys{$self->get_id()};
@@ -95,6 +99,12 @@ sub get_knowing_users {
 sub get_by_id($) {
     my $id = shift;
     return $_keys{$id};
+              }
+
+# Get a list of keys by name
+sub get_by_name($) {
+    my $name = shift;
+    return map(get_by_id($_), sort keys %{$_keys_by_name{$name}});
 }
 
 # Get a list of all keys
@@ -128,6 +138,24 @@ sub critique {
                 push(@c,
                      "  Origins:",
                      map("    $_", @origins));
+            }
+        }
+    }
+    for my $name (sort keys %_keys_by_name) {
+        my @keys = get_by_name($name);
+        if(@keys > 1) {
+            push(@c,
+                 "Trouble with name $name:",
+                 "  Name maps to ".(scalar @keys)." different keys:");
+            for my $k (@keys) {
+                my @origins = $k->get_origins();
+                push(@c,
+                     "  Key ID ".$k->get_id());
+                if(@origins > 0) {
+                    push(@c,
+                         "  Origins:",
+                         map("    $_", @origins));
+                }
             }
         }
     }

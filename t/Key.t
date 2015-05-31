@@ -1,7 +1,7 @@
 use warnings;
 use strict;
 use Greenend::SSH::Key;
-use Test::Simple tests => 61;
+use Test::Simple tests => 78;
 
 # Protocol version 1 
 my $k1 = Greenend::SSH::Key->new
@@ -14,6 +14,9 @@ ok($k1->{name} eq "root\@sfere", "name should be 'root\@sfere', is '$k1->{name}'
 ok($k1->{bits} == 1024, "bits should be 1024, is $k1->{bits}");
 ok($k1->{strength} == 80, "strength should be 80, is $k1->{strength}");
 ok($k1->get_id() eq '04c2aa02e11c78269526f3f67a7c436a', "id should be 04c2aa02e11c78269526f3f67a7c436a, is ".$k1->get_id());
+my @k1 = Greenend::SSH::Key::get_by_name('root@sfere');
+ok(@k1 == 1);
+ok($k1[0] == $k1);
 
 # Protocol version 2: RSA
 my $k2 = Greenend::SSH::Key->new
@@ -73,6 +76,15 @@ ok($k5->{bits} == 256, "bits should be 256, is $k5->{bits}");
 ok($k5->{strength} == 128, "strength should be 128, is $k5->{strength}");
 ok($k5->get_id() eq 'bcf4459762d4d5dcb7938119aad0ce1a', "id should be bcf4459762d4d5dcb7938119aad0ce1a, is ".$k5->get_id());
 
+# Duplicate one of the keys under a clashing name
+Greenend::SSH::Key->new
+    ('authorized_keys_line'
+     => "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL9xVKZrXpx+sMD0+P712BF2ah88jUUHG0bCBXBkKg9r richard\@araminta");
+my @ks = Greenend::SSH::Key::get_by_name('richard@araminta');
+ok(@ks == 2);
+ok($ks[0] == $k2);
+ok($ks[1] == $k5);
+
 my @keys = Greenend::SSH::Key::all_keys();
 #print STDERR "\n", map($_->get_id()."\n", @keys);
 ok(@keys == 5);
@@ -101,9 +113,22 @@ my @expect = ('Trouble with key 04c2aa02e11c78269526f3f67a7c436a',
               '    whatever',
               '  Origins:',
               '    that',
-              '    this');
+              '    this',
+              'Trouble with key bcf4459762d4d5dcb7938119aad0ce1a',
+              '  Key has multiple names',
+              '  Names:',
+              '    richard@araminta',
+              '    richard@araminta-ed25519',
+              'Trouble with name richard@araminta:',
+              '  Name maps to 2 different keys:',
+              '  Key ID 35dd6a606baf6692f59e31138898b0f8',
+              '  Origins:',
+              '    that',
+              '    this',
+              '  Key ID bcf4459762d4d5dcb7938119aad0ce1a');
 
 ok(@critique == scalar @expect);
 for my $n (0..$#expect) {
     ok($critique[$n] eq $expect[$n]);
 }
+

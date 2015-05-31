@@ -468,7 +468,12 @@ for my $key (Greenend::SSH::Key::all_keys()) {
     # Keys with multiple names in green (only one name is shown)
     $fontcolor = "green" if keys %{$key->{names}} > 1;
     # Keys which share names with other keys in blue
-    #$fontcolor = "blue" if $info{$keyid}->{nameshare}; ## TODO
+    for my $name ($key->get_names()) {
+        if(Greenend::SSH::Key::get_by_name($name) > 1) {
+            $fontcolor = "blue";
+            last;
+        }
+    }
     push(@graph, "  k", $key->get_id(),
          " [label=\"", keyName($key), "|$key->{type}|$key->{strength} ($key->{bits}b)\",",
          "shape=record,color=$color,fontcolor=$fontcolor");
