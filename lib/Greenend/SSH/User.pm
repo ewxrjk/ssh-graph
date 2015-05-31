@@ -49,7 +49,7 @@ sub get_known_keys {
     return _keys(keys %{$self->{known_keys}});
 }
 
-sub knows_keys {
+sub knows_key {
     my $self = shift;
     my $key = shift;
     return exists $self->{known_keys}->{$key->get_id()};
@@ -68,7 +68,7 @@ sub get_accepted_keys {
     return _keys(keys %{$self->{accepts_keys}});
 }
 
-sub accepts_keys {
+sub accepts_key {
     my $self = shift;
     my $key = shift;
     return exists $self->{accepts_keys}->{$key->get_id()};
@@ -102,7 +102,7 @@ sub critique {
                 my $uu = $_users{$uuid};
                 push(@trouble, "  User $uu->{name} can access $u->{name} using multiple keys:");
                 for my $k (@accepted_keys) {
-                    if($uu->knows_keys($k)) {
+                    if($uu->knows_key($k)) {
                         push(@trouble, "    ".$k->get_id." ($k->{name})");
                     }
                 }
