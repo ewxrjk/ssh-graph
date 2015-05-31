@@ -1,3 +1,13 @@
+ssh-graph (0.6) unstable; urgency=medium
+
+  * Internal refactoring.
+    The main behavior change is that the list of problems with keys is
+    tidier and much more systematic.
+    Key and user tracking classes are now exposed as documented (although
+    not yet completely stable) APIs.
+
+ -- Richard Kettlewell <rjk@greenend.org.uk>  Sun, 31 May 2015 11:57:29 +0100
+
 ssh-graph (0.5) unstable; urgency=medium
 
   * Support ed25519 keys.
