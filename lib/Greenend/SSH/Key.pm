@@ -28,6 +28,7 @@ sub initialize {
     $self->{accepted_by} = {};
     $self->{names} = {};
     $self->{origins} = {};
+    $self->{issues} = {};
     while(@_ > 0) {
         my $key = shift;
         my $value = shift;
@@ -122,13 +123,24 @@ sub critique {
         my @origins = $k->get_origins();
         my @known_by = $k->get_knowing_users();
         my @trouble = ();
-        push(@trouble, "  Key has multiple names") if @names > 1;
-        push(@trouble, "  Key is usable with protocol 1") if $k->{protocol} < 2;
-        push(@trouble,
-             "  Key ".$k->get_id()." is known by multiple users:",
-             map("    $_->{name}", @known_by)) if @known_by > 1;
-        push(@trouble, "  $k->{type} $k->{bits} key is too weak")
-            if $k->{strength} < $args{strength};
+        if(@names > 1) {
+            push(@trouble, "  Key has multiple names");
+            $k->{issues}->{multiple_names} = [@names];
+        }
+        if($k->{protocol} < 2) {
+            push(@trouble, "  Key is usable with protocol 1");
+            $k->{issues}->{bad_protocol} = 1;
+        }
+        if(@known_by > 1) {
+            push(@trouble,
+                 "  Key ".$k->get_id()." is known by multiple users:",
+                 map("    $_->{name}", @known_by));
+            $k->{issues}->{multiple_users} = [@known_by];
+        }
+        if($k->{strength} < $args{strength}) {
+            push(@trouble, "  $k->{type} $k->{bits} key is too weak");
+            $k->{issues}->{weak} = $k->{strength};
+        }
         if(@trouble) {
             push(@c, "Trouble with key ".$k->get_id());
             push(@c, @trouble);
@@ -148,6 +160,7 @@ sub critique {
                  "Trouble with name $name:",
                  "  Name maps to ".(scalar @keys)." different keys:");
             for my $k (@keys) {
+                $k->{issues}->{clashing_name} = [@keys];
                 my @origins = $k->get_origins();
                 push(@c,
                      "  Key ID ".$k->get_id());
