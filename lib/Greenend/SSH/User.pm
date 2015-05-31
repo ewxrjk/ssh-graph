@@ -42,7 +42,7 @@ sub initialize {
             die "Greenend::SSH::User::initialize: unrecognized initialization key '$key'";
         }
     }
-    die "Greenend::SSH::Key::get_id: key not initialized"
+    die "Greenend::SSH::User::initialize: user not initialized"
         unless exists $self->{name};
     if(exists $_users{$self->{name}}) {
         return $_users{$self->{name}};
