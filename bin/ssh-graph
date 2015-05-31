@@ -477,9 +477,19 @@ for my $key (Greenend::SSH::Key::all_keys()) {
     ## For each key that a host trusts, an edge from key to host
     for my $user ($key->get_accepting_users()) {
         my $color = "black";
-        # Edges for multiple keys on the same host in green
-        #TODO
+        # If a user can access this user via multiple keys, color the
+        # edge green
+        my $keys = 0;
+        for my $uu ($key->get_knowing_users()) {
+            for my $kk ($uu->get_known_keys()) {
+                if($user->accepts_key($kk)) {
+                    ++$keys;
+                }
+            }
+        }
+        $color = 'green' if $keys > 1;
         # Edges from weak keys in red
+        $color = 'red' if $key->{strength} < $minStrength;
         push(@graph, "  k", $key->get_id(), " -> u$user->{serial} [color=$color];\n");
     }
 }
