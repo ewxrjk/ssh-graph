@@ -21,6 +21,20 @@ use MIME::Base64;
 use Digest;
 use Math::BigInt;
 
+=head1 NAME
+
+Greenend::SSH::Key - Information about an SSH public key
+
+=head1 SYNSOPSIS
+
+B<use Greenend::SSH::Key;>
+
+=head1 DESCRIPTION
+
+B<Key> objects represent information about SSH public keys.
+
+=cut
+
 # Map IDs to key structures
 our %_keys = ();
 
@@ -30,7 +44,25 @@ our %_keys_by_name = ();
 # Hash for key fingerprints (anything acceptable to Digest.pm will do)
 our $fingerprint_hash = "MD5";
 
-# new Greenend::SSH::Key(KEY=>VALUE, ...)
+=head1 CONSTRUCTOR
+
+  $key = Greenend::SSH::Key->new(pub_key_file => PATH);
+  $key = Greenend::SSH::Key->new(authorize_keys_line => LINE,
+                                 origin => FILENAME);
+
+Creates a key object either from a B<.pub> file or from a line found
+in an B<authorized_keys> file.
+
+As well as recording the value of the key this also records the name
+of the key and, optionally, the origin.
+
+If the same key (as identified by the hashed of the public key
+material) is constructed multiple times you will always get the same
+object.  However, the multiple possible names and origins for the key
+are tracked.
+
+=cut
+
 sub new {
     my $self = bless {}, shift;
     return $self->initialize(@_);
@@ -75,7 +107,25 @@ sub initialize {
     return $existing;
 }
 
-# Get the ID of a key
+=head1 INSTANCE METHODS
+
+=head2 get_id
+
+  $id = $key->get_id();
+
+Returns the fingerprint of B<$key> in hex.
+
+This fingerprint is constructed as OpenSSH does for protocol 2 keys
+(at least up to version 6.7), i.e. as the MD5 hash of the key blob.
+So in most cases the hashes will be directly comparable with the ones
+OpenSSH shows you.  However, they may differ for protocol 1 keys.
+
+The hash function used may be changed by setting
+B<$Greenend::SSH::Key::fingerprint_hash>.  Any value acceptable to
+L<Digest> will do.  You must do this before constructing any keys!
+
+=cut
+
 sub get_id($) {
     my $self = shift;
     die "Greenend::SSH::Key::get_id: key not initialized"
@@ -86,25 +136,55 @@ sub get_id($) {
     return $d->hexdigest();
 }
 
-# Get a list of the places a key was found
+=head2 get_origins
+
+  @origins = $key->get_origins();
+
+Returns a list of origins for B<$key>, as specified to the constructor.
+
+=cut
+
 sub get_origins {
     my $self = shift;
     return sort keys %{$self->{origins}};
 }
 
-# Get a list of the names for this key
+=head2 get_names
+
+  @names = $key->get_names();
+
+Returns a list of names for B<$key>.
+
+=cut
+
 sub get_names {
     my $self = shift;
     return sort keys %{$self->{names}};
 }
 
-# Get a list of accepting users
+=head2 get_accepting_users
+
+  @users = $key->get_accepting_users();
+
+Returns a list of users that accept connections authenticated by
+B<$key>.  Each element is a L<Greenend::SSH::User> object.
+
+=cut
+
 sub get_accepting_users {
     my $self = shift;
     return _users(keys %{$self->{accepted_by}});
 }
 
-# Get a list of users who know this key
+=head2 get_knowing_users
+
+  @users = $key->get_knowing_users();
+
+Returns a list of users that know the private key corresponding to
+B<$key>.  Each element is a L<Greenend::SSH::User> object.
+
+=cut
+
 sub get_knowing_users {
     my $self = shift;
     return _users(keys %{$self->{known_by}});
@@ -112,22 +192,66 @@ sub get_knowing_users {
 
 ########################################################################
 
-# Get a key by ID
+=head1 CLASS METHODS
+
+=head2 get_by_id
+
+  $key = Greenend::SSH::Key::get_by_id($id);
+
+Return the key with fingerprint B<$id> (see above), or B<undef> if
+there is no such key.
+
+=cut
+
 sub get_by_id($) {
     my $id = shift;
     return $_keys{$id};
-              }
+}
 
-# Get a list of keys by name
+=head2 get_by_name
+
+  @keys = Greenend::SSH::Key::get_byname($name);
+
+Return the keys with name B<$name>.
+
+=cut
+
 sub get_by_name($) {
     my $name = shift;
     return map(get_by_id($_), sort keys %{$_keys_by_name{$name}});
 }
 
-# Get a list of all keys
+=head2 all_keys
+
+  @keys = Greenend::SSH::Key::all_keys();
+
+Return a list of all keys.
+
+=cut
+
 sub all_keys {
     return map($_keys{$_}, sort keys %_keys);
 }
+
+=head2 critique
+
+  @problems = Greenend::SSH::Key::critique();
+  @problems = Greenend::SSH::Key::critique(strength => STRENGTH);
+
+Identify problems found with keys.
+
+If the B<strength> parameter is supplied this is the minimum
+permissible security strength, in bits.  The default is 128.  (Note
+that asymmetric algorithms - RSA and *DSA - have a much lower strength
+than the total number of bits in the key.)
+
+The return value is an English-language description of the problems.
+Each list element is a single line with no newline appended.
+
+As well as computing this list, the issues with each key are recorded.
+See below for discussion.
+
+=cut
 
 # Critique the set of all keys
 sub critique {
@@ -190,6 +314,58 @@ sub critique {
     }
     return @c;
 }
+
+=head1 INSTANCE VARIABLES
+
+=head2 issues
+
+This is updated by the B<critique> method and the corresponding method
+L<Greenend::SSH::User/critique>.  It is a hash ref, and the keys have
+the following meanings:
+
+=head3 multiple_names
+
+  $key->{issues}->{multiple_names} = [$name0, $name1, ...];
+
+If the key has multiple names, they are listed here.
+
+=head3 bad_protocol
+
+  $key->{issues}->{bad_protocol} = $protocol;
+
+If the key is usable with SSH protocol 1, this is set to 1.
+
+=head3 multiple_users
+
+  $key->{issues}->{multiple_users} = [$user0, $user1, ...]
+
+If the key is known to multiple users, they are listed here.  Each
+element is a L<Greenend::SSH::User> object.
+
+=head3 strength
+
+  $key->{issues}->{strength} = $bits;
+
+If the key is too weak, its strength is listed here.
+
+=head3 clashing_name
+
+  $key->{issues}->{clashing_name} = [$key0, $key1, ...]
+
+If this key shares a name with any other key, all such keys are listed
+here.
+
+=head3 multiple_paths
+
+  $key->{issues}->{multiple_paths}->{$username} = 1
+
+If B<$username> accepts connections authenticated both by B<$key> and
+also by some other key whose private half is known to the same user as
+knows the private half of B<$key>, then this is set.
+
+Note that this is only set by L<Greenend::SSH::User/critique>.
+
+=cut
 
 ########################################################################
 
@@ -370,3 +546,12 @@ sub _hex_to_mpint($) {
 }
 
 return 1;
+
+=head1 NOTES
+
+A future version of this API may hide the B<issues> member behind a
+getter method.  Be prepared to write users.
+
+=head1 SEE ALSO
+
+L<Greenend::SSH::User>, L<ssh-graph(1)>

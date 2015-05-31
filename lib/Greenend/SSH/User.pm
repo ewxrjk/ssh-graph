@@ -18,10 +18,35 @@ use Greenend::SSH::Key;
 use warnings;
 use strict;
 
+=head1 NAME
+
+Greenend::SSH::User - Information about a user of SSH
+
+=head1 SYNSOPSIS
+
+B<use Greenend::SSH::User;>
+
+=head1 DESCRIPTION
+
+B<User> objects represent information about users of SSH.  They are
+meant to be used in conjunction with L<Greenend::SSH::User> objects.
+
+=cut
+
 our %_users = ();
 our $_next_serial = 0;
 
-# new Greenend::SSH::User(KEY=>VALUE, ...)
+=head1 CONSTRUCTOR
+
+  $user = Greenend::SSH::User->new(name => NAME);
+
+Creates a user object with B<NAME> as its name.
+
+If the same user (as identified by name) is constructed multiple times
+you will always get the same object.
+
+=cut
+
 sub new {
     my $self = bless {}, shift;
     return $self->initialize(@_);
@@ -51,6 +76,18 @@ sub initialize {
     return $self;
 }
 
+=head1 INSTANCE METHODS
+
+In this section, B<$key> is always a L<Greenend::SSH::Key> object.
+
+=head2 add_knows_key
+
+  $user->add_knows_key($key);
+
+Record that B<$user> knows the private half of B<$key>.
+
+=cut
+
 sub add_knows_key {
     my $self = shift;
     my $key = shift;
@@ -59,16 +96,41 @@ sub add_knows_key {
     return $self;
 }
 
+=head2 get_known_keys
+
+  @keys = $user->get_known_keys();
+
+Returns the list of keys that B<$user> knows the private half of.
+Each element is a L<Greenend::SSH::Key> object.
+
+=cut
+
 sub get_known_keys {
     my $self = shift;
     return _keys(keys %{$self->{known_keys}});
 }
+
+=head2 knows_key
+
+  if($user->knows_key($key)) { #...
+
+Returns a true if B<$user> knows the private half of B<$key>.
+
+=cut
 
 sub knows_key {
     my $self = shift;
     my $key = shift;
     return exists $self->{known_keys}->{$key->get_id()};
 }
+
+=head2 add_accepts_key
+
+  $user->add_accepts_key($key);
+
+Record that B<$user> accepts connections authenticated by B<$key>.
+
+=cut
 
 sub add_accepts_key {
     my $self = shift;
@@ -78,10 +140,27 @@ sub add_accepts_key {
     return $self;
 }
 
+=head2 get_accepted_keys
+
+  @keys = $user->get_accepted_keys();
+
+Returns the list of keys that B<$user> accepts connections
+authenticated by.  Each element is a L<Greenend::SSH::Key> object.
+
+=cut
+
 sub get_accepted_keys {
     my $self = shift;
     return _keys(keys %{$self->{accepts_keys}});
 }
+
+=head2 accepts_key
+
+  if($user->accepts_key($key)) { #...
+
+Returns a true if B<$user> accepts connections authenticated by B<$key>.
+
+=cut
 
 sub accepts_key {
     my $self = shift;
@@ -91,9 +170,39 @@ sub accepts_key {
 
 ########################################################################
 
+=head1 CLASS METHODS
+
+=head2 all_users
+
+  @users = Greenend::SSH::User::all_users();
+
+Returns a list of all known users.
+
+=cut
+
 sub all_users {
     return map($_users{$_}, sort keys %_users);
 }
+
+=head2 critique
+
+  @problems = Greenend::SSH::User::critique();
+  @problems = Greenend::SSH::User::critique(strength => STRENGTH);
+
+Identify problems found with users and keys.
+
+If the B<strength> parameter is supplied this is the minimum
+permissible security strength, in bits.  The default is 128.  (Note
+that asymmetric algorithms - RSA and *DSA - have a much lower strength
+than the total number of bits in the key.)
+
+The return value is an English-language description of the problems.
+Each list element is a single line with no newline appended.
+
+As well as computing this list, the issues with each key are recorded.
+See L<Greenend::SSH::Key/issues> for the details.
+
+=cut
 
 sub critique {
     my %args = @_;
@@ -139,3 +248,7 @@ sub _keys {
 }
 
 1;
+
+=head1 SEE ALSO
+
+L<Greenend::SSH::Key>, L<ssh-graph(1)>
