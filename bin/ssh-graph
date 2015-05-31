@@ -18,7 +18,6 @@
 use strict;
 use warnings;
 use POSIX;
-use MIME::Base64;
 use Greenend::SSH::Key;
 use Greenend::SSH::User;
 
@@ -204,10 +203,6 @@ B<ssh>(1), B<dot>(1)
 
 our $VERSION = '0.5';
 
-our %has = ();          # HOST has KEYID's privkey if has{KEYID}->{HOST}
-our %knows = ();	# HOST has KEYID's privkey if KEYID in knows{HOST}
-our %trusts = ();       # HOST trusts KEYID if trusts{KEYID}->{HOST}
-our %info = ();         # metadata abot KEYID: info{KEYID}->{...}
 our %command = ();      # command to access host
 
 our $verbose = 0;       # --verbose option
