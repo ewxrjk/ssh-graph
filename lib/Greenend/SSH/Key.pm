@@ -388,7 +388,7 @@ sub _authorized_keys_line($$) {
     if(!$self->_authorized_keys_fragment($_)
        and /^\s*([^\s\"]|\"([^\"]|\\\")*\")+\s+(.*)/) {
         my $suffix = $3;
-        if(!self->_authorized_keys_fragment($suffix)) {
+        if(!$self->_authorized_keys_fragment($suffix)) {
             die "ERROR: cannot parse key: $_\n";
         }
     }
