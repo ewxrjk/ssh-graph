@@ -66,14 +66,30 @@ The default is 112.
 
 Revoke all the keys listed in I<PATH>.
 
-=item B<--show-untrusted>
+=item B<--show> I<CLASSES>
 
-Show keys that nothing trusts.  This is the default.
+Lists the key classes that will be shown.  The possible key classes
+are:
 
-=item B<--no-show-untrusted>
+=over 4
 
-Don't show keys that nothing trusts.
-Note that this hides even weak and revoked keys.
+=item B<all>
+
+Show all keys.  This is the default.
+
+=item B<trusted>
+
+Show keys that something trusts.
+
+=item B<weak>
+
+Show weak keys.
+
+=item B<revoked>
+
+Show revoked keys.
+
+=back
 
 =item B<--connect> [I<USER1>B<@>]I<HOST1> [I<USER1>B<@>]I<HOST2>
 
@@ -225,7 +241,7 @@ our @ak = ("authorized_keys", "authorized_keys2");
 our $keySerial = 0;     # counter for key serial number
 our $strip;             # suffix to strip from key names
 our $minStrength = 112; # minimum security strength
-our $showUntrusted = 1; # --show-untrusted
+our @show = ('all');    # keys to show
 our $subgraphs = 0;	# use subgraph clusters (not pretty...)
 our $connect_root = 0;  # auto-connect root@
 our @connect_extra = ();# extra connections
@@ -324,7 +340,7 @@ Options:
   --strip SUFFIX        Suffix to strip from key names
   --strength BITS       Minimum SP800-57 security strength
   --revoke PATH         Revoke keys found in PATH
-  --[no]-show-untrusted Show (default) or hide untrusted keys
+  --show CLASSES        Key classes to show
   --help                Display usage message
   --version             Display version string
 ";
@@ -352,10 +368,8 @@ Options:
         $minStrength = shift;
     } elsif($opt eq "--revoke") {
         push(@revoke, shift);
-    } elsif($opt eq "--no-show-untrusted") {
-        $showUntrusted = 0;
-    } elsif($opt eq "--show-untrusted") {
-        $showUntrusted = 1;
+    } elsif($opt eq "--show") {
+        @show = split(/,/, shift);
     } elsif($opt eq "--") {
         last;
     } else {
@@ -364,6 +378,30 @@ Options:
 }
 
 die "ERROR: no hosts specified\n" unless @ARGV > 0 or $local;
+
+## Process set of keys to show
+our %show = ();
+for my $show (@show) {
+    if($show eq 'all') {
+        $show{'trusted'} = $show{'weak'} = $show{'revoked'} = 1;
+    } elsif($show eq 'trusted') {
+        $show{'trusted'} = 1;
+    } elsif($show eq 'weak') {
+        $show{'weak'} = 1;
+    } elsif($show eq 'revoked') {
+        $show{'revoked'} = 1;
+    } else {
+        die "ERROR: unknown --show argument '$show'\n";
+    }
+}
+
+sub showable {
+    my $key = shift;
+    return 1 if $key->{issues}->{weak} and defined $show{'weak'};
+    return 1 if $key->revoked() and defined $show{'revoked'};
+    return 1 if $key->get_accepting_users() > 0 and defined $show{'trusted'};
+    return 0;
+}
 
 ## Read local keys and configuration
 if($local) {
@@ -475,7 +513,7 @@ for my $user (Greenend::SSH::User::all_users()) {
     push(@graph, "$p  u$serial [label=\"$name\"];\n");
     # For each key the user knows, an edge from user to key
     for my $key (@keys) {
-        next unless $key->get_accepting_users() > 0 or $showUntrusted;
+        next unless showable($key);
         my @users = $key->get_knowing_users();
         my $color = exists $key->{issues}->{multiple_users} ? "black" : "blue";
         push(@graph, "$p  u$serial -> k", $key->get_id(), " [color=$color];\n");
@@ -510,6 +548,7 @@ for my $key (Greenend::SSH::Key::all_keys()) {
     my $fontcolor = "black";
     my $color = "black";
     my $fillcolor = "";
+    next unless showable($key);
     if(exists $key->{issues}->{weak} or $key->revoked()) {
         # Weak and revoked keys outlined in red
         $color = "red";
@@ -523,7 +562,6 @@ for my $key (Greenend::SSH::Key::all_keys()) {
         $color = "grey";
         $fontcolor = "grey";
     }
-    next unless $key->get_accepting_users() > 0 or $showUntrusted;
     # Keys with multiple names in green (only one name is shown)
     $fontcolor = "green" if exists $key->{issues}->{multiple_names};
     # Keys which share names with other keys in blue
