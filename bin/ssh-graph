@@ -437,12 +437,14 @@ for my $host (@ARGV) {
 ## Read revocation lists
 # TODO full OpenSSH RevokedKeys support.
 for my $revoke_path (@revoke) {
+    my $lineno = 0;
     for my $revoke_line (readLocalFile($revoke_path)) {
+        ++$lineno;
         chomp $revoke_line;
         $revoke_line =~ s/^\s*//;
         $revoke_line =~ s/^#.*//;
         next if $revoke_line eq '';
-        my $k = Greenend::SSH::Key->new(origin => $revoke_path,
+        my $k = Greenend::SSH::Key->new(origin => "$revoke_path:$lineno",
                                         keyblob => $revoke_line);
         $k->revoke();
     }
