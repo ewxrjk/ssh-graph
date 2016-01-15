@@ -86,6 +86,7 @@ sub initialize {
     $self->{names} = {};
     $self->{origins} = {};
     $self->{issues} = {};
+    $self->{revoked} = 0;
     while(@_ > 0) {
         my $key = shift;
         my $value = shift;
@@ -205,6 +206,33 @@ B<$key>.  Each element is a L<Greenend::SSH::User> object.
 sub get_knowing_users {
     my $self = shift;
     return _users(keys %{$self->{known_by}});
+}
+
+=head2 revoke
+
+  $key->revoke()
+
+Marks a key as revoked.
+
+=cut
+
+sub revoke {
+    my $self = shift;
+    $self->{revoked} = 1;
+    return $self;
+}
+
+=head2 revoked
+
+  $revoked = $key->revoked();
+
+Returns nonzero if the key is revoked.
+
+=cut
+
+sub revoked {
+    my $self = shift;
+    return $self->{revoked};
 }
 
 ########################################################################
@@ -454,10 +482,11 @@ sub _public_key_text($$) {
 sub _keyblob($$) {
     my $self = shift;
     local $_ = shift;
-    if(/^\s*([a-z0-9\-]+)\s+([0-9a-z\+\/=]+)$/i) {
+    if(/^\s*([a-z0-9\-]+)\s+([0-9a-z\+\/=]+)(\s+(.*))?$/i) {
         $self->{type} = $1;
         $self->{keydata} = $2;
         $self->{protocol} = 2;
+        $self->{name} = $4 if defined $4;
     } else {
         return 0;
     }

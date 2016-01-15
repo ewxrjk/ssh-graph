@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 #
-# Copyright © 2013-2015 Richard Kettlewell
+# Copyright © 2013-2016 Richard Kettlewell
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -62,6 +62,10 @@ Specifies a suffix to strip from key names.
 The minimum security strength for a key not to be considered weak.
 The default is 112.
 
+=item B<--revoke> I<PATH>
+
+Revoke all the keys listed in I<PATH>.
+
 =item B<--show-untrusted>
 
 Show keys that nothing trusts.  This is the default.
@@ -69,7 +73,7 @@ Show keys that nothing trusts.  This is the default.
 =item B<--no-show-untrusted>
 
 Don't show keys that nothing trusts.
-Note that this hides even weak keys.
+Note that this hides even weak and revoked keys.
 
 =item B<--connect> [I<USER1>B<@>]I<HOST1> [I<USER1>B<@>]I<HOST2>
 
@@ -128,9 +132,9 @@ second the key type and the third the key strength and (in brackets)
 size.
 
 If the box is red then that means the key is weak (as defined by the
-B<--strength> options).
+B<--strength> options) or revoked.
 
-If the box filled in red then not only is the key weak but it can
+If the box filled in red then not only is the key weak or revoked, but it can
 access some host.  It is recommended that you correct any such
 situations.
 
@@ -151,7 +155,7 @@ confusing.
 Each host is shown in an ellipse.
 
 Inbound edges indicate keys that can access the host.  If they are
-red, that means the key is weak.
+red, that means the key is weak or has been revoked.
 
 Outbound edges to a key mean that the host has the private half of
 that key.
@@ -225,6 +229,7 @@ our $showUntrusted = 1; # --show-untrusted
 our $subgraphs = 0;	# use subgraph clusters (not pretty...)
 our $connect_root = 0;  # auto-connect root@
 our @connect_extra = ();# extra connections
+our @revoke = ();       # revocation lists
 
 # Convert the filename of a public key to the filename of the assumed
 # corresponding private key.
@@ -318,6 +323,7 @@ Options:
   --verbose             Verbose operation
   --strip SUFFIX        Suffix to strip from key names
   --strength BITS       Minimum SP800-57 security strength
+  --revoke PATH         Revoke keys found in PATH
   --[no]-show-untrusted Show (default) or hide untrusted keys
   --help                Display usage message
   --version             Display version string
@@ -344,6 +350,8 @@ Options:
         $strip = shift;
     } elsif($opt eq "--strength") {
         $minStrength = shift;
+    } elsif($opt eq "--revoke") {
+        push(@revoke, shift);
     } elsif($opt eq "--no-show-untrusted") {
         $showUntrusted = 0;
     } elsif($opt eq "--show-untrusted") {
@@ -426,6 +434,20 @@ for my $host (@ARGV) {
     print STDERR "\n" if $verbose;
 }
 
+## Read revocation lists
+# TODO full OpenSSH RevokedKeys support.
+for my $revoke_path (@revoke) {
+    for my $revoke_line (readLocalFile($revoke_path)) {
+        chomp $revoke_line;
+        $revoke_line =~ s/^\s*//;
+        $revoke_line =~ s/^#.*//;
+        next if $revoke_line eq '';
+        my $k = Greenend::SSH::Key->new(origin => $revoke_path,
+                                        keyblob => $revoke_line);
+        $k->revoke();
+    }
+}
+
 # Report any problems found
 print STDERR map("$_\n",
                  Greenend::SSH::Key::critique(strength => $minStrength),
@@ -486,8 +508,8 @@ for my $key (Greenend::SSH::Key::all_keys()) {
     my $fontcolor = "black";
     my $color = "black";
     my $fillcolor = "";
-    if(exists $key->{issues}->{weak}) {
-        # Weak keys outlined in red
+    if(exists $key->{issues}->{weak} or $key->revoked()) {
+        # Weak and revoked keys outlined in red
         $color = "red";
         # Weak keys that something trusts filled in red
         if($key->get_accepting_users() > 0) {
@@ -516,8 +538,8 @@ for my $key (Greenend::SSH::Key::all_keys()) {
         # edge green
         $color = 'green'
             if exists $key->{issues}->{multiple_paths}->{$user->{name}};
-        # Edges from weak keys in red
-        $color = 'red' if $key->{strength} < $minStrength;
+        # Edges from weak and revoked keys in red
+        $color = 'red' if $key->{strength} < $minStrength or $key->revoked();
         push(@graph, "  k", $key->get_id(), " -> u$user->{serial} [color=$color];\n");
     }
 }

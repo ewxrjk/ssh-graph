@@ -1,4 +1,4 @@
-# Copyright © 2015 Richard Kettlewell
+# Copyright © 2015-2016 Richard Kettlewell
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -213,8 +213,12 @@ sub critique {
         my %accepted_users = ();
         my @trouble = ();
         for my $k (@accepted_keys) {
-            push(@trouble, "  Trusts weak key ".$k->get_id." ($k->{name})")
+            my $id = $k->get_id();
+            my $name = $k->{name};
+            push(@trouble, "  Trusts weak key $id ($k->{name})")
                 if $k->{strength} < $args{strength};
+            push(@trouble, "  Trusts revoked key $id ($k->{name})")
+                if $k->revoked();
             for my $uu ($k->get_knowing_users()) {
                 $accepted_users{$uu->{name}} = 0
                     unless exists $accepted_users{$uu->{name}};
