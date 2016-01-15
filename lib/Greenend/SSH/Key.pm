@@ -90,6 +90,8 @@ sub initialize {
             die "Greenend::SSH::Key::initialize: unrecognized initialization key '$key'";
         }
     }
+    die "$self->{origin}: Greenend::SSH::Key::initialize: keydata not set"
+        unless exists $self->{keydata};
     $_keys_by_name{$self->{name}}->{$self->get_id()} = 1;
     my $existing;
     if(exists $_keys{$self->get_id()}) {
