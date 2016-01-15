@@ -1,4 +1,4 @@
-# Copyright © 2013-2015 Richard Kettlewell
+# Copyright © 2013-2016 Richard Kettlewell
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -377,7 +377,11 @@ sub _read_pub_key_file($$) {
     die "ERROR: $path: $!\n" unless $f;
     my $line = <$f>;
     $f->close();
-    return $self->_authorized_keys_line($line);
+    chomp $line;
+    if(!$self->_public_key_text($line)) {
+        die "ERROR: cannot parse key: $line\n";
+    }
+    return $self;
 }
 
 # Read one line in an OpenSSH authorized_keys file
@@ -385,17 +389,24 @@ sub _authorized_keys_line($$) {
     my $self = shift;
     local $_ = shift;
     chomp $_;
-    if(!$self->_authorized_keys_fragment($_)
-       and /^\s*([^\s\"]|\"([^\"]|\\\")*\")+\s+(.*)/) {
-        my $suffix = $3;
-        if(!$self->_authorized_keys_fragment($suffix)) {
-            die "ERROR: cannot parse key: $_\n";
-        }
+
+    # Docs say options field never starts with a number, but non-options often
+    # start with a non-number, so this seems to be pretty useless.  Instead we
+    # just try to match plausible and well-known option names.
+    #
+    # TODO 'cert-authority' and 'principals' deserve special treatment,
+    # as they expand the set of keys that will actually be accepted.
+    while(s/^((cert-authority|no-[0-9a-z\-]+)|([a-z]+=\"([^\"\\]|\\[\"\\])*\")),*//gi) {
+    }
+    s/^\s+//;
+
+    if(!$self->_public_key_text($_)) {
+        die "ERROR: cannot parse key: $_\n";
     }
     return $self;
 }
 
-sub _authorized_keys_fragment($$) {
+sub _public_key_text($$) {
     my $self = shift;
     local $_ = shift;
     if(/^\s*(\d+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+(.*)$/i) {

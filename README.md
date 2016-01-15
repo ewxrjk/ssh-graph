@@ -28,7 +28,7 @@ After installing, you can find documentation with the perldoc command.
 License And Copyright
 ---------------------
 
-Copyright © 2013-2015 Richard Kettlewell
+Copyright © 2013-2016 Richard Kettlewell
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
