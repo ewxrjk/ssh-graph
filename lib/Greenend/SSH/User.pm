@@ -212,14 +212,14 @@ sub critique {
         my @accepted_keys = $u->get_accepted_keys();
         my %accepted_users = ();
         my @trouble = ();
-        for my $k (@accepted_keys) {
-            my $id = $k->get_id();
-            my $name = $k->{name};
-            push(@trouble, "  Trusts weak key $id ($k->{name})")
-                if $k->{strength} < $args{strength};
-            push(@trouble, "  Trusts revoked key $id ($k->{name})")
-                if $k->revoked();
-            for my $uu ($k->get_knowing_users()) {
+        for my $key (@accepted_keys) {
+            my $id = $key->get_id();
+            my $name = $key->{name};
+            push(@trouble, "  Trusts weak key $id ($key->{name})")
+                if $key->{strength} < $args{strength};
+            push(@trouble, "  Trusts revoked key $id ($key->{name})")
+                if $key->revoked();
+            for my $uu ($key->get_knowing_users()) {
                 $accepted_users{$uu->{name}} = 0
                     unless exists $accepted_users{$uu->{name}};
                 $accepted_users{$uu->{name}} += 1;
@@ -229,10 +229,10 @@ sub critique {
             if($accepted_users{$uuid} > 1) {
                 my $uu = $_users{$uuid};
                 push(@trouble, "  User $uu->{name} can access $u->{name} using multiple keys:");
-                for my $k (@accepted_keys) {
-                    if($uu->knows_key($k)) {
-                        push(@trouble, "    ".$k->get_id." ($k->{name})");
-                        $k->{issues}->{multiple_paths}->{$u->{name}} = 1;
+                for my $key (@accepted_keys) {
+                    if($uu->knows_key($key)) {
+                        push(@trouble, "    ".$key->get_id." ($key->{name})");
+                        $key->{issues}->{multiple_paths}->{$u->{name}} = 1;
                     }
                 }
             }

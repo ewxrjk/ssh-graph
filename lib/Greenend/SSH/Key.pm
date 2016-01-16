@@ -309,31 +309,31 @@ sub critique {
     $args{strength} = 128 unless exists $args{strength};
     $args{select} = sub { return 1; } unless exists $args{select};
     my @c = ();
-    for my $k (all_keys()) {
-        my @names = $k->get_names();
-        my @origins = $k->get_origins();
-        my @known_by = $k->get_knowing_users();
+    for my $key (all_keys()) {
+        my @names = $key->get_names();
+        my @origins = $key->get_origins();
+        my @known_by = $key->get_knowing_users();
         my @trouble = ();
         if(@names > 1) {
             push(@trouble, "  Key has multiple names");
-            $k->{issues}->{multiple_names} = [@names];
+            $key->{issues}->{multiple_names} = [@names];
         }
-        if($k->{protocol} < 2) {
+        if($key->{protocol} < 2) {
             push(@trouble, "  Key is usable with protocol 1");
-            $k->{issues}->{bad_protocol} = 1;
+            $key->{issues}->{bad_protocol} = 1;
         }
         if(@known_by > 1) {
             push(@trouble,
-                 "  Key ".$k->get_id()." is known by multiple users:",
+                 "  Key ".$key->get_id()." is known by multiple users:",
                  map("    $_->{name}", @known_by));
-            $k->{issues}->{multiple_users} = [@known_by];
+            $key->{issues}->{multiple_users} = [@known_by];
         }
-        if($k->{strength} < $args{strength}) {
-            push(@trouble, "  $k->{type} $k->{bits} key is too weak");
-            $k->{issues}->{weak} = $k->{strength};
+        if($key->{strength} < $args{strength}) {
+            push(@trouble, "  $key->{type} $key->{bits} key is too weak");
+            $key->{issues}->{weak} = $key->{strength};
         }
-        if(@trouble && &{$args{select}}($k)) {
-            push(@c, "Trouble with key ".$k->get_id());
+        if(@trouble && &{$args{select}}($key)) {
+            push(@c, "Trouble with key ".$key->get_id());
             push(@c, @trouble);
             push(@c, "  Names:",
                  map("    $_", @names));
@@ -350,11 +350,11 @@ sub critique {
             push(@c,
                  "Trouble with name $name:",
                  "  Name maps to ".(scalar @keys)." different keys:");
-            for my $k (@keys) {
-                $k->{issues}->{clashing_name} = [@keys];
-                my @origins = $k->get_origins();
+            for my $key (@keys) {
+                $key->{issues}->{clashing_name} = [@keys];
+                my @origins = $key->get_origins();
                 push(@c,
-                     "  Key ID ".$k->get_id());
+                     "  Key ID ".$key->get_id());
                 if(@origins > 0) {
                     push(@c,
                          "  Origins:",

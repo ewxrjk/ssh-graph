@@ -482,9 +482,9 @@ for my $revoke_path (@revoke) {
         $revoke_line =~ s/^\s*//;
         $revoke_line =~ s/^#.*//;
         next if $revoke_line eq '';
-        my $k = Greenend::SSH::Key->new(origin => "$revoke_path:$lineno",
+        my $key = Greenend::SSH::Key->new(origin => "$revoke_path:$lineno",
                                         keyblob => $revoke_line);
-        $k->revoke();
+        $key->revoke();
     }
 }
 
