@@ -557,7 +557,7 @@ sub _set_strength($) {
             $self->{strength} = 256;
         } elsif($domain eq '1.3.132.0.1') { # nistk163
             $self->{bits} = 163;
-            $self->{strength} = $80;
+            $self->{strength} = 80;
         } elsif($domain eq '1.3.132.0.26') { # nistb233
             $self->{bits} = 233;
             $self->{strength} = 112;
