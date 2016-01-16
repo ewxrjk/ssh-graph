@@ -1,5 +1,10 @@
+COPYING
 MANIFEST
 Makefile.PL
 README.md
-COPYING
 bin/ssh-graph
+lib/Greenend/SSH/Key.pm
+lib/Greenend/SSH/User.pm
+t/AKF.t
+t/Key.t
+t/User.t

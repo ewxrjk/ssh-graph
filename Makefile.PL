@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 #
-# Copyright © 2013-2015 Richard Kettlewell
+# Copyright © 2013-2016 Richard Kettlewell
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,13 +25,6 @@ WriteMakefile(
     VERSION_FROM        => 'bin/ssh-graph',
     ABSTRACT            => "Graph SSH key distribution and check for anomalies",
     LICENSE             => 'gpl',
-#    MAN1PODS => {
-#        'bin/viewgcov' => 'blib/man1/viewgcov',
-#    },
     EXE_FILES => [ 'bin/ssh-graph' ],
-#    PREREQ_PM => {
-#        'Gtk2' => 0,
-#    },
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
-#    clean               => { FILES => 'Greenend-ViewGCOV-Foo-*' },
 );
