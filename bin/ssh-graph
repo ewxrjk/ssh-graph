@@ -490,7 +490,8 @@ for my $revoke_path (@revoke) {
 
 # Report any problems found
 print STDERR map("$_\n",
-                 Greenend::SSH::Key::critique(strength => $minStrength),
+                 Greenend::SSH::Key::critique(strength => $minStrength,
+                                              select => \&showable),
                  Greenend::SSH::User::critique(strength => $minStrength));
 
 ## Construct the graph

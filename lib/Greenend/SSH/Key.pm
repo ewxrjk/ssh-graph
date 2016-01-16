@@ -280,20 +280,25 @@ sub all_keys {
 
 =head2 critique
 
-  @problems = Greenend::SSH::Key::critique();
-  @problems = Greenend::SSH::Key::critique(strength => STRENGTH);
+  @problems = Greenend::SSH::Key::critique(strength => STRENGTH,
+                                           select => SUB);
 
 Identify problems found with keys.
 
-If the B<strength> parameter is supplied this is the minimum
+If the optional B<strength> parameter is supplied this is the minimum
 permissible security strength, in bits.  The default is 128.  (Note
 that asymmetric algorithms - RSA and *DSA - have a much lower strength
 than the total number of bits in the key.)
+
+The the optional B<select> parameter is supplied, then this is called
+for each key to determine if it should be critiqued.  It should return
+1 to critique the key and 0 to suppress it.
 
 The return value is an English-language description of the problems.
 Each list element is a single line with no newline appended.
 
 As well as computing this list, the issues with each key are recorded.
+(This is not affected by the B<select> parameter.)
 See below for discussion.
 
 =cut
@@ -302,6 +307,7 @@ See below for discussion.
 sub critique {
     my %args = @_;
     $args{strength} = 128 unless exists $args{strength};
+    $args{select} = sub { return 1; } unless exists $args{select};
     my @c = ();
     for my $k (all_keys()) {
         my @names = $k->get_names();
@@ -326,7 +332,7 @@ sub critique {
             push(@trouble, "  $k->{type} $k->{bits} key is too weak");
             $k->{issues}->{weak} = $k->{strength};
         }
-        if(@trouble) {
+        if(@trouble && &{$args{select}}($k)) {
             push(@c, "Trouble with key ".$k->get_id());
             push(@c, @trouble);
             push(@c, "  Names:",
@@ -339,7 +345,7 @@ sub critique {
         }
     }
     for my $name (sort keys %_keys_by_name) {
-        my @keys = get_by_name($name);
+        my @keys = grep &{$args{select}}($_),get_by_name($name);
         if(@keys > 1) {
             push(@c,
                  "Trouble with name $name:",
