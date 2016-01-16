@@ -97,7 +97,7 @@ Include a dotted edge from I<HOST1> to I<HOST2>.
 
 =item B<--connect-root>
 
-Include a dotted edge from B<root@>I<HOST> to all other users on
+For all hosts, include a dotted edge from B<root@>I<HOST> to all other users on
 I<HOST>.
 
 =item B<--verbose>
