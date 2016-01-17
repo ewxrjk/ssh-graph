@@ -235,6 +235,50 @@ sub revoked {
     return $self->{revoked};
 }
 
+=head2 get_trouble
+
+  @trouble = $key->get_trouble(strength => STRENGTH);
+
+Returns a list of problems with this key.
+
+If the optional B<strength> parameter is supplied this is the minimum
+permissible security strength, in bits.  The default is 128.  (Note
+that asymmetric algorithms - RSA and *DSA - have a much lower strength
+than the total number of bits in the key.)
+
+The return value is an English-language description of the problems.
+Each list element is a single line with no newline appended.
+
+=cut
+
+sub get_trouble {
+    my $key = shift;
+    my %args = @_;
+    $args{strength} = 128 unless exists $args{strength};
+    my @names = $key->get_names();
+    my @known_by = $key->get_knowing_users();
+    my @trouble = ();
+    if(@names > 1) {
+        push(@trouble, "Key has multiple names");
+        $key->{issues}->{multiple_names} = [@names];
+    }
+    if($key->{protocol} < 2) {
+        push(@trouble, "Key is usable with protocol 1");
+        $key->{issues}->{bad_protocol} = 1;
+    }
+    if(@known_by > 1) {
+        push(@trouble,
+             "Key ".$key->get_id()." is known by multiple users:",
+             map("  $_->{name}", @known_by));
+        $key->{issues}->{multiple_users} = [@known_by];
+    }
+    if($key->{strength} < $args{strength}) {
+        push(@trouble, "$key->{type} $key->{bits} key is too weak");
+        $key->{issues}->{weak} = $key->{strength};
+    }
+    return @trouble;
+}
+
 ########################################################################
 
 =head1 CLASS METHODS
@@ -310,31 +354,12 @@ sub critique {
     $args{select} = sub { return 1; } unless exists $args{select};
     my @c = ();
     for my $key (all_keys()) {
+        my @trouble = $key->get_trouble(%args);
         my @names = $key->get_names();
         my @origins = $key->get_origins();
-        my @known_by = $key->get_knowing_users();
-        my @trouble = ();
-        if(@names > 1) {
-            push(@trouble, "  Key has multiple names");
-            $key->{issues}->{multiple_names} = [@names];
-        }
-        if($key->{protocol} < 2) {
-            push(@trouble, "  Key is usable with protocol 1");
-            $key->{issues}->{bad_protocol} = 1;
-        }
-        if(@known_by > 1) {
-            push(@trouble,
-                 "  Key ".$key->get_id()." is known by multiple users:",
-                 map("    $_->{name}", @known_by));
-            $key->{issues}->{multiple_users} = [@known_by];
-        }
-        if($key->{strength} < $args{strength}) {
-            push(@trouble, "  $key->{type} $key->{bits} key is too weak");
-            $key->{issues}->{weak} = $key->{strength};
-        }
         if(@trouble && &{$args{select}}($key)) {
             push(@c, "Trouble with key ".$key->get_id());
-            push(@c, @trouble);
+            push(@c, map("  $_", @trouble));
             push(@c, "  Names:",
                  map("    $_", @names));
             if(@origins > 0) {
