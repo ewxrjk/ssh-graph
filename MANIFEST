@@ -5,6 +5,7 @@ README.md
 bin/ssh-graph
 lib/Greenend/SSH/Key.pm
 lib/Greenend/SSH/User.pm
-t/AKF.t
+t/AuthorizedKeysFile.t
 t/Key.t
+t/PubKeyFile.t
 t/User.t
