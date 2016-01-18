@@ -1,0 +1,27 @@
+#! /bin/sh
+set -e
+
+s() {
+  echo "$@"
+  "$@"
+}
+
+makekey() {
+  name="$1"
+  type="$2"
+  size="$3"
+  echo name="$name"
+  echo type="$type"
+  echo size="$size"
+  s rm -f $name
+  s ssh-keygen -t $type -b $size -C $name -f $name -N ''
+}
+
+makekey rsa1 rsa1 1024
+makekey rsa1024 rsa 1024
+makekey rsa2048 rsa 2048
+makekey rsa3072 rsa 3072
+makekey dsa1024 dsa 1024
+makekey ecdsa256 ecdsa 256
+makekey ed25519 ed25519 256
+makekey ed25519bis ed25519 256

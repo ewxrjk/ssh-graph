@@ -488,8 +488,8 @@ sub _public_key_text($$) {
     if(/^\s*(\d+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+(.*)$/i) {
         # 1: bits exponent modulus comment
         $self->{type} = "rsa";
-        my $n = (new Math::BigInt($3))->as_hex();
         my $e = (new Math::BigInt($2))->as_hex();
+        my $n = (new Math::BigInt($3))->as_hex();
         $self->{protocol} = 1;
         $self->{name} = $4;
         $self->{bits} = $1;
@@ -525,6 +525,12 @@ sub _keyblob($$) {
     return 1;
 }
 
+sub _bignum($) {
+    my $raw = shift;
+    $raw =~ s/./sprintf("%02x", ord($&))/ges;
+    return Math::BigInt->new("0x$raw");
+}
+
 # Set the strength of a key
 sub _set_strength($) {
     # http://csrc.nist.gov/publications/nistpubs/800-57/sp800-57_part1_rev3_general.pdf
@@ -541,6 +547,8 @@ sub _set_strength($) {
         $n =~ s/^\0*//;
         $self->{bits} = 8 * length($n);
         $self->{strength} = _nfs_strength($self->{bits});
+        $self->{rsa}->{n} = _bignum($n);
+        $self->{rsa}->{e} = _bignum($e);
     } elsif($type eq 'ssh-dss') {
         $self->{type} = 'dsa';
         # DSA key format:
@@ -556,6 +564,10 @@ sub _set_strength($) {
         my $nstrength = _discrete_log_strength($nbits);
         $self->{strength} = ($lstrength < $nstrength ? $lstrength
                              : $nstrength);
+        $self->{dsa}->{p} = _bignum($p);
+        $self->{dsa}->{g} = _bignum($g);
+        $self->{dsa}->{q} = _bignum($q);
+        $self->{dsa}->{y} = _bignum($y);
     } elsif($type =~ /^ecdsa-/) {
         $self->{type} = 'ecdsa';
         my ($type, $domain, $q) = unpack("l>/a l>/a l>/a", $decoded);
@@ -601,11 +613,13 @@ sub _set_strength($) {
         } else {
             die "ERROR: unrecognized EC domain parameters $domain\n";
         }
+        $self->{ecdsa}->{q} = _bignum($q);
     } elsif($type eq 'ssh-ed25519') {
         # ed25519 keys are always 256 bits long
         $self->{type} = 'ed25519';
         $self->{bits} = 256;
         $self->{strength} = 128;
+        # TODO stash pubkey
     } else {
         die "ERROR: unrecognized key type $type\n";
     }
@@ -643,7 +657,8 @@ sub _discrete_log_strength($) {
 sub _hex_to_mpint($) {
     local $_ = shift;
     s/^(0x)?0*//i;
-    $_ = "00$_" if /^[90a-f]/i;
+    $_ = "0$_" if length($_) & 1;
+    $_ = "00$_" if /^[9a-f]/i;
     return pack("H*", $_);
 }
 

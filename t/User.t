@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 #
-# Copyright © 2015 Richard Kettlewell
+# Copyright © 2015, 2016 Richard Kettlewell
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,10 +26,10 @@ my $u2 = Greenend::SSH::User->new(name => 'fred');
 
 my $k1 = Greenend::SSH::Key->new
     ('authorized_keys_line'
-     => "1024 37 95633395528117590747303319371338448851686531460586925513248626947974833009238798388199329302111402320576268507724784771246224785673098716306832520795997763067549719287376372175346609804890861650378436221064848327626639950669591963095939342996298572807646637073406245108182135449004573333607292244832714236837 root\@sfere\n");
+     => "1024 65537 167844116856772115643578165728646832238977011226514542147340716952508093585575456382466917264655551996680365035622281503365888943953690244682249450439760860544322107624193057364972557417929833165604293403606026919903687463292811771750729180768776277916268938968997228428980058794608820423445889709946628253763 rsa1\n");
 my $k2 = Greenend::SSH::Key->new
     ('authorized_keys_line'
-     => 'ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAw4IKtGiqHBOfPp1VW9ZF8vD6tOa6r46iwR9neok10hbEG4bp+Yljof25dUWJoTXLUkqk4h48h4A+vojkVbvWldw61xwefmTAVW7UKt0kVwHlDNBYxAf1P1KvWaU96XOwtT9s3dG75auWadnN39wDbrVL/ZMr4NSekju0PTq2h9rPJN6X2NLxM7/z82Grkz4FbT3isB4Kyhn+IJ89KepGGJG91s3dUwiC0VpYOqiAwPz9RExwutpdI4rNqoy51swAiQfnIV7fSxekj7Mv/Jbhsbt0khhgAOOj1D+lCHlbatQNBKDorXulv3HwXXfnyWW3Tqg8XirvjJbUw69ApMHYpQ== richard@araminta');
+     => 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDc7qFIWeamHY4JgU/jfW9gzQpvE0iWnQApCcN2R+jr30XdAVDpyMyuL+YeAvikk23XlqYetBZIlIbUuXtbHzOJbjy5GQ/QxydkGbop6bvGcuChGQh96cJIl4M7Dev2fqP7LCaZlYV1h8aZrwNZHgjzs7JlLnu0qcUT5bkaVsrSKdX2VhwffVFadkK9TjbogJRvabrA1LlAELEOpzwy7BwcHejesARrmJWWqS8uwHjBmbgwIKCQQo7qI77SJ+FGMBJ+wQch7rC1gC1XZH+PMS6cKeEbsSJAC78dKiDuLTmKyN6k1SxflYPJjdyYCZ3Jiurb7iTqyILxDloUHYiGeeq3 rsa2048');
 
 ok($u1->{name} eq 'bob');
 ok($u2->{name} eq 'fred');
@@ -56,7 +56,7 @@ ok($u2_accepted[0] == $k1);
 my @critique = Greenend::SSH::User::critique();
 #print STDERR "\n", map("$_\n", @critique), "----\n";
 my @expect = ('Trouble with user fred',
-              '  Trusts weak key 04c2aa02e11c78269526f3f67a7c436a (root@sfere)');
+              '  Trusts weak key 91cff00e21764aff1d19933bc7a40056 (rsa1)');
 ok(@critique == scalar @expect,
    "expect ".(scalar @expect)." got ".(scalar @critique));
 for my $n (0..$#expect) {
@@ -68,11 +68,11 @@ $u2->add_accepts_key($k2);
 @critique = Greenend::SSH::User::critique();
 #print STDERR "\n", map("$_\n", @critique), "----\n";
 @expect =    ('Trouble with user fred',
-              '  Trusts weak key 04c2aa02e11c78269526f3f67a7c436a (root@sfere)',
-              '  Trusts weak key 35dd6a606baf6692f59e31138898b0f8 (richard@araminta)',
+              '  Trusts weak key 91cff00e21764aff1d19933bc7a40056 (rsa1)',
+              '  Trusts weak key d3d0c0b84efe325d0354d3c36000a198 (rsa2048)',
               '  User fred can access fred using multiple keys:',
-              '    04c2aa02e11c78269526f3f67a7c436a (root@sfere)',
-              '    35dd6a606baf6692f59e31138898b0f8 (richard@araminta)');
+              '    91cff00e21764aff1d19933bc7a40056 (rsa1)',
+              '    d3d0c0b84efe325d0354d3c36000a198 (rsa2048)');
 
 ok(@critique == scalar @expect,
    "expect ".(scalar @expect)." got ".(scalar @critique));

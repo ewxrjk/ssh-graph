@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 #
-# Copyright © 2015 Richard Kettlewell
+# Copyright © 2015, 2016 Richard Kettlewell
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,15 +23,15 @@ use Test::Simple tests => 81;
 # Protocol version 1 
 my $k1 = Greenend::SSH::Key->new
     ('authorized_keys_line'
-     => "1024 37 95633395528117590747303319371338448851686531460586925513248626947974833009238798388199329302111402320576268507724784771246224785673098716306832520795997763067549719287376372175346609804890861650378436221064848327626639950669591963095939342996298572807646637073406245108182135449004573333607292244832714236837 root\@sfere\n");
+     => "1024 65537 167844116856772115643578165728646832238977011226514542147340716952508093585575456382466917264655551996680365035622281503365888943953690244682249450439760860544322107624193057364972557417929833165604293403606026919903687463292811771750729180768776277916268938968997228428980058794608820423445889709946628253763 rsa1\n");
 
 ok($k1->{type} eq "rsa", "type should be 'rsa', is '$k1->{type}'");
 ok($k1->{protocol} == 1, "protocol should be 1, is $k1->{protocol}");
-ok($k1->{name} eq "root\@sfere", "name should be 'root\@sfere', is '$k1->{name}'");
+ok($k1->{name} eq "rsa1", "name should be 'rsa1', is '$k1->{name}'");
 ok($k1->{bits} == 1024, "bits should be 1024, is $k1->{bits}");
 ok($k1->{strength} == 80, "strength should be 80, is $k1->{strength}");
-ok($k1->get_id() eq '04c2aa02e11c78269526f3f67a7c436a', "id should be 04c2aa02e11c78269526f3f67a7c436a, is ".$k1->get_id());
-my @k1 = Greenend::SSH::Key::get_by_name('root@sfere');
+ok($k1->get_id() eq '91cff00e21764aff1d19933bc7a40056', "id should be 91cff00e21764aff1d19933bc7a40056, is ".$k1->get_id());
+my @k1 = Greenend::SSH::Key::get_by_name('rsa1');
 ok(@k1 == 1);
 ok($k1[0] == $k1);
 
@@ -39,117 +39,117 @@ ok($k1[0] == $k1);
 my $k2 = Greenend::SSH::Key->new
     ('origin' => 'this',
      'authorized_keys_line'
-     => 'ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAw4IKtGiqHBOfPp1VW9ZF8vD6tOa6r46iwR9neok10hbEG4bp+Yljof25dUWJoTXLUkqk4h48h4A+vojkVbvWldw61xwefmTAVW7UKt0kVwHlDNBYxAf1P1KvWaU96XOwtT9s3dG75auWadnN39wDbrVL/ZMr4NSekju0PTq2h9rPJN6X2NLxM7/z82Grkz4FbT3isB4Kyhn+IJ89KepGGJG91s3dUwiC0VpYOqiAwPz9RExwutpdI4rNqoy51swAiQfnIV7fSxekj7Mv/Jbhsbt0khhgAOOj1D+lCHlbatQNBKDorXulv3HwXXfnyWW3Tqg8XirvjJbUw69ApMHYpQ== richard@araminta');
+     => 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDc7qFIWeamHY4JgU/jfW9gzQpvE0iWnQApCcN2R+jr30XdAVDpyMyuL+YeAvikk23XlqYetBZIlIbUuXtbHzOJbjy5GQ/QxydkGbop6bvGcuChGQh96cJIl4M7Dev2fqP7LCaZlYV1h8aZrwNZHgjzs7JlLnu0qcUT5bkaVsrSKdX2VhwffVFadkK9TjbogJRvabrA1LlAELEOpzwy7BwcHejesARrmJWWqS8uwHjBmbgwIKCQQo7qI77SJ+FGMBJ+wQch7rC1gC1XZH+PMS6cKeEbsSJAC78dKiDuLTmKyN6k1SxflYPJjdyYCZ3Jiurb7iTqyILxDloUHYiGeeq3 rsa2048');
 ok($k2->{type} eq "rsa", "type should be 'rsa', is '$k2->{type}'");
 ok($k2->{protocol} == 2, "protocol should be 2, is $k2->{protocol}");
-ok($k2->{name} eq "richard\@araminta", "name should be 'richard\@araminta', is '$k2->{name}'");
+ok($k2->{name} eq "rsa2048", "name should be 'rsa2048', is '$k2->{name}'");
 ok($k2->{bits} == 2048, "bits should be 2048, is $k2->{bits}");
 ok($k2->{strength} == 112, "strength should be 112, is $k2->{strength}");
-ok($k2->get_id() eq '35dd6a606baf6692f59e31138898b0f8', "id should be 35dd6a606baf6692f59e31138898b0f8, is ".$k2->get_id());
+ok($k2->get_id() eq 'd3d0c0b84efe325d0354d3c36000a198', "id should be d3d0c0b84efe325d0354d3c36000a198, is ".$k2->get_id());
 
 # Same key expressed in protocol 1 syntax
 my $k2a = Greenend::SSH::Key->new
     ('origin' => 'that',
      'authorized_keys_line'
-     => "2048 35 24680595477525071228666633858974963585906849900974439839578949001692366606597465594249720474414183481002713560548983496180359661349390548247578966073578565758901345239741420806584897592905957641342654084126808544821100685977418731234538635643841034986124074900753190550499024384177037489585685752810877026168072619161557543447153927029641776563335582354757144867142251742199586137289279340716248862111939672028058138328638468944710937041913535022007325231825313139914727487113071915288479232035741967531919174623541376962435078203579995261966542129398869680459166135674190480851510272383972134434068010705926951655589 whatever");
-ok($k2a->get_id() eq '35dd6a606baf6692f59e31138898b0f8', "id should be 35dd6a606baf6692f59e31138898b0f8, is ".$k2a->get_id());
+     => "2048 65537 27890099936309844001169849360014919587785712948701108795600711012521167629947138715124967965832414993083013177155935677352803260435638299910717276195397800537688069089306001700120819707013775055107662363925784352092326903153096467127388137908943787839948010211262682475843805358385665255996716697074389549381249367625423783798131801920913928720141962092132140798102688322026705708167025658768367583144931055763628772600136988520483666219273294017053976029821219351864288798378909423354426708285506263498515769784601981189756629018210359483677940073118021053548827498248017750198293137422960214220529996023833395063479 whatever");
+ok($k2a->get_id() eq 'd3d0c0b84efe325d0354d3c36000a198', "id should be d3d0c0b84efe325d0354d3c36000a198, is ".$k2a->get_id());
 ok($k2 == $k2a);
 ok($k2->{protocol} == 1, "protocol should be 1, is $k2->{protocol}");
 my @k2names = $k2->get_names();
 ok(@k2names == 2);
-ok($k2names[0] eq 'richard@araminta');
+ok($k2names[0] eq 'rsa2048');
 ok($k2names[1] eq 'whatever');
 
 # Protocol version 2: DSA
 my $k3 = Greenend::SSH::Key->new
     ('authorized_keys_line'
-     => "ssh-dss AAAAB3NzaC1kc3MAAACBAPJb8fEipFHAKxP3B2d8eSyf5tGQiAQGdzlxjjaZJCDF6kw3Z7iH2ywWHHlt0IlQRVB20my7YXs1jwj/k4zYYihYL5iY4Lqux2PuTCCRy+ts2XbJjYdZJs0SIERMOv6qunzjgFHFQNNYCPgNxxdz2av9eKE4aUGYhYBSdmXmbJrzAAAAFQDoGzAwGXOeXKV80CBSGcn1IkS2twAAAIEA56C2T+nfoX7odyP1ECyfALq+/xXaAHDjckRESv4PXVx321znHGAqia8EixmIaGE7hpFTK9EkeTUx7XoNEE2fWAMV7PP/A6QDsB6fR6adi2PqPn2SnnPYraoLcpp8hK0kBC33ua8vxGE6dgf7gRf3xOUWt7X9YP0BY6kxaHyGKEIAAACBAJHF/JJiC7p2MMtgIo29g5wzLXo+9aVsRSknJu/G0fZTm/x1PNU0XOT9zo29TkFFymLU+YTGxwABLoZOnQxwTeKkJhX21vlrpCHDGRejY6ARSzm6dqBJpBKs9sMoJGITi4LkL5+ce9cwYOL5DJSvDVMkoNUbGRVIRMuvCeSJTr/p root\@araminta");
+     => "ssh-dss AAAAB3NzaC1kc3MAAACBAPV/+T4AEj/azMpiJnV4rryiE8zcW5qgbgeBHXuhYNEMCoI9DSvBZ7Wbk2zoMgdgRvRp2EE3CWW0xsFcHkPSnX8Ph6nTII3qmrp+nsNvaX/wfMSSrEi/AO8BFMDSjrLPaNewJ6GEUlA5XsEf87OJTRsmrEU7+xJTmttgk6pXDKEFAAAAFQDQDJRseaykcytWouSY1tVY9f7+uQAAAIB5kaRrQMFi3v9ODL2kJa/vCa5t3KB3ELAPSdeHNQJ+kD4imUaEfuAHc6oukesdUL2Ux7pzfnqeGMP9fo/gP67L121JNksaYj+rf6pOHW6/QCrQUuCyNlZlZ9qkw3HowUuc/qGA2D59lUEFleVgcYe9ChTgmTwyMgGQC9tVBebsIQAAAIEAg6PkCpwC/v9uC2DXj9uu2dazAd90o0ycqxNw6ttZldvxp4LLn4cksMluaIJv1kifqNZcwjib61nVZxN/Gq+CNeB1LoKPy0jtNQvFj9jtrK3n9+syv1KpiukrU0Jd2uGQLfA5e4aQFmN+NMCtyuQ3HHCQzf7cWde6t6c0WTe0lpw= dsa1024");
 ok($k3->{type} eq "dsa", "type should be 'dsa', is '$k3->{type}'");
 ok($k3->{protocol} == 2, "protocol should be 2, is $k3->{protocol}");
-ok($k3->{name} eq "root\@araminta", "name should be 'root\@araminta', is '$k3->{name}'");
+ok($k3->{name} eq "dsa1024", "name should be 'dsa1024', is '$k3->{name}'");
 ok($k3->{bits} == 1024, "bits should be 1024, is $k3->{bits}");
 ok($k3->{strength} == 80, "strength should be 80, is $k3->{strength}");
-ok($k3->get_id() eq '3034d1713a5a0b61d9f091f9dd606984', "id should be 3034d1713a5a0b61d9f091f9dd606984, is ".$k3->get_id());
+ok($k3->get_id() eq 'd349bc5c3dc4b13baa59b5777407084b', "id should be d349bc5c3dc4b13baa59b5777407084b, is ".$k3->get_id());
 
 # Protocol version 2: ECDSA
 my $k4 = Greenend::SSH::Key->new
     ('authorized_keys_line'
-     => "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAk1wsDsaOJ27QqV3j3ruRphhtaH2dxYX9H1dTlk9ViW9RxamlpXj1Hksb45wyVwJTKukIq5Q+eVIwogjMO26c0= richard\@araminta-ec256");
+     => "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGovIc1tTB7SWx7ZRLDL3CKglV2jACOCyW0ZTZI/8g0fZNM2Xhx4I4YtJPaY25rHeFpq3aABQR8V6QG3zPBao0g= ecdsa256");
 ok($k4->{type} eq "ecdsa", "type should be 'ecdsa', is '$k4->{type}'");
 ok($k4->{protocol} == 2, "protocol should be 2, is $k4->{protocol}");
-ok($k4->{name} eq "richard\@araminta-ec256", "name should be 'richard\@araminta-ec256', is '$k4->{name}'");
+ok($k4->{name} eq "ecdsa256", "name should be 'ecdsa256', is '$k4->{name}'");
 ok($k4->{bits} == 256, "bits should be 256, is $k4->{bits}");
 ok($k4->{strength} == 128, "strength should be 128, is $k4->{strength}");
-ok($k4->get_id() eq '88870be2e50fab04442357051bcba335', "id should be 88870be2e50fab04442357051bcba335, is ".$k4->get_id());
+ok($k4->get_id() eq '377530fa5462e3e167bc8fc57b2eaca3', "id should be 377530fa5462e3e167bc8fc57b2eaca3, is ".$k4->get_id());
 
 # Protocol version 2: ED25519
 my $k5 = Greenend::SSH::Key->new
     ('authorized_keys_line'
-     => "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL9xVKZrXpx+sMD0+P712BF2ah88jUUHG0bCBXBkKg9r richard\@araminta-ed25519");
+     => "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKDjyq41f8d/RFLFAhpBo5b4BB3qVmaEf4x4FwrdrSM9 ed25519");
 ok($k5->{type} eq "ed25519", "type should be 'ed25519', is '$k5->{type}'");
 ok($k5->{protocol} == 2, "protocol should be 2, is $k5->{protocol}");
-ok($k5->{name} eq "richard\@araminta-ed25519", "name should be 'richard\@araminta-ed25519', is '$k5->{name}'");
+ok($k5->{name} eq "ed25519", "name should be 'ed25519', is '$k5->{name}'");
 ok($k5->{bits} == 256, "bits should be 256, is $k5->{bits}");
 ok($k5->{strength} == 128, "strength should be 128, is $k5->{strength}");
-ok($k5->get_id() eq 'bcf4459762d4d5dcb7938119aad0ce1a', "id should be bcf4459762d4d5dcb7938119aad0ce1a, is ".$k5->get_id());
+ok($k5->get_id() eq '279226df0980a1acfe27683d317f7445', "id should be 279226df0980a1acfe27683d317f7445, is ".$k5->get_id());
 
 # Duplicate one of the keys under a clashing name
 Greenend::SSH::Key->new
     ('authorized_keys_line'
-     => "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL9xVKZrXpx+sMD0+P712BF2ah88jUUHG0bCBXBkKg9r richard\@araminta");
-my @ks = Greenend::SSH::Key::get_by_name('richard@araminta');
+     => "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKDjyq41f8d/RFLFAhpBo5b4BB3qVmaEf4x4FwrdrSM9 rsa2048");
+my @ks = Greenend::SSH::Key::get_by_name('rsa2048');
 ok(@ks == 2);
-ok($ks[0] == $k2);
-ok($ks[1] == $k5);
+ok($ks[0] == $k5);
+ok($ks[1] == $k2);
 
 my $k6 = Greenend::SSH::Key->new
     ('keyblob'
-     => "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEVvTK0Ra28YSULIuQjcOATUFJCq3sQ4zysi7NgpJeL5");
-ok($k6->get_id() eq 'f94728f2fb76f3abeac1e8a5b81883b1');
-ok($k6->{name} eq 'f94728f2fb76f3abeac1e8a5b81883b1');
+     => "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFDwq3KcbDeOMlbjD/A9jIaDwLtnDRqFlvP6Ra+VwUPx");
+ok($k6->get_id() eq '8854af93ce830639110028406dfdc428');
+ok($k6->{name} eq '8854af93ce830639110028406dfdc428');
 
 my @keys = Greenend::SSH::Key::all_keys();
 #print STDERR "\n", map($_->get_id()."\n", @keys);
 ok(@keys == 6);
-ok($keys[0] == $k1);
-ok($keys[1] == $k3);
-ok($keys[2] == $k2);
-ok($keys[3] == $k4);
-ok($keys[4] == $k5);
-ok($keys[5] == $k6);
+ok($keys[0] == $k5);
+ok($keys[1] == $k4);
+ok($keys[2] == $k6);
+ok($keys[3] == $k1);
+ok($keys[4] == $k3);
+ok($keys[5] == $k2);
 
 my @critique = Greenend::SSH::Key::critique(strength => 112);
 #print STDERR "\n", map("$_\n", @critique), "----\n";
-my @expect = ('Trouble with key 04c2aa02e11c78269526f3f67a7c436a',
+my @expect = ('Trouble with key 279226df0980a1acfe27683d317f7445',
+              '  Key has multiple names',
+              '  Names:',
+              '    ed25519',
+              '    rsa2048',
+              'Trouble with key 91cff00e21764aff1d19933bc7a40056',
               '  Key is usable with protocol 1',
               '  rsa 1024 key is too weak',
               '  Names:',
-              '    root@sfere',
-              'Trouble with key 3034d1713a5a0b61d9f091f9dd606984',
+              '    rsa1',
+              'Trouble with key d349bc5c3dc4b13baa59b5777407084b',
               '  dsa 1024 key is too weak',
               '  Names:',
-              '    root@araminta',
-              'Trouble with key 35dd6a606baf6692f59e31138898b0f8',
+              '    dsa1024',
+              'Trouble with key d3d0c0b84efe325d0354d3c36000a198',
               '  Key has multiple names',
               '  Key is usable with protocol 1',
               '  Names:',
-              '    richard@araminta',
+              '    rsa2048',
               '    whatever',
               '  Origins:',
               '    that',
               '    this',
-              'Trouble with key bcf4459762d4d5dcb7938119aad0ce1a',
-              '  Key has multiple names',
-              '  Names:',
-              '    richard@araminta',
-              '    richard@araminta-ed25519',
-              'Trouble with name richard@araminta:',
+              'Trouble with name rsa2048:',
               '  Name maps to 2 different keys:',
-              '  Key ID 35dd6a606baf6692f59e31138898b0f8',
+              '  Key ID 279226df0980a1acfe27683d317f7445',
+              '  Key ID d3d0c0b84efe325d0354d3c36000a198',
               '  Origins:',
               '    that',
-              '    this',
-              '  Key ID bcf4459762d4d5dcb7938119aad0ce1a');
+              '    this');
 
 ok(@critique == scalar @expect);
 for my $n (0..$#expect) {
