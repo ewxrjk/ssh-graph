@@ -230,7 +230,7 @@ B<ssh>(1), B<dot>(1)
 
 =cut
 
-our $VERSION = '0.6';
+our $VERSION = '0.7';
 
 our %command = ();      # command to access host
 
