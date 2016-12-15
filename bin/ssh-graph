@@ -287,9 +287,15 @@ sub readRemoteFile($$) {
 }
 
 # List the remote files matching a glob pattern.
-sub listRemoteFiles($$) {
-    my ($host, $pattern) = @_;
-    return remoteCommand($host, "ls -1 $pattern || true");
+sub listRemoteFiles($$$) {
+    my ($host, $dir, $pattern) = @_;
+    my @f = ();
+    for my $name (remoteCommand($host, "ls -1 $dir")) {
+	if($name =~ $pattern) {
+	    push(@f, "$dir/$name");
+	}
+    }
+    return @f;
 }
 
 # Return true if a remote file exists.
@@ -451,8 +457,8 @@ for my $host (@ARGV) {
     }
     print STDERR "Checking $host...\n" if $verbose;
     my $user = Greenend::SSH::User->new(name => $host);
-    my @pubkeys = listRemoteFiles($host, ".ssh/*.pub");
-    for my $pubkeypath (listRemoteFiles($host, ".ssh/*.pub")) {
+    my @pubkeys = listRemoteFiles($host, ".ssh", "\\.pub\$");
+    for my $pubkeypath (@pubkeys) {
         my $privkeypath = privkey($pubkeypath);
         if(defined $privkeypath && remoteFileExists($host, $privkeypath)) {
             print STDERR "  Key: $pubkeypath\n" if $verbose;
