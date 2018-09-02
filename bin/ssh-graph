@@ -232,7 +232,7 @@ B<ssh>(1), B<dot>(1)
 
 our $VERSION = '0.7';
 
-our %command = ();      # command to access host
+our %command = ();	# hostname -> sub(hostname, shell-command)
 
 our $verbose = 0;       # --verbose option
 our $local = 1;         # consult local ~/.ssh
@@ -423,7 +423,8 @@ if($local) {
         my $privkeypath = privkey($pubkeypath);
         if(defined $privkeypath && -e $privkeypath) {
             print STDERR "  Key: $pubkeypath\n" if $verbose;
-            $localUser->add_knows_key($pubkey);
+	    @privkey = readLocalFile($privkeypath);
+            $localUser->add_knows_key($pubkey, \@privkey);
         }
     }
     for my $ak (@ak) {
@@ -439,6 +440,7 @@ if($local) {
 ## Read remote keys and configuration
 
 for my $host (@ARGV) {
+    # Figure out how to execute a shell command on the remote host
     if($host =~ /:/) {
         my @hostbits = split(/:/, $host);
         $host = pop @hostbits;
@@ -465,7 +467,8 @@ for my $host (@ARGV) {
             my @pubkeyfile = readRemoteFile($host, $pubkeypath);
             my $pubkey = Greenend::SSH::Key->new(authorized_keys_line => $pubkeyfile[0],
                                                  origin => "$host:$pubkeypath");
-            $user->add_knows_key($pubkey);
+	    my @privkey = readRemoteFile($host, $privkeypath);
+            $user->add_knows_key($pubkey, \@privkey);
         }
     }
     for my $ak (@ak) {

@@ -34,9 +34,9 @@ my $k2 = Greenend::SSH::Key->new
 ok($u1->{name} eq 'bob');
 ok($u2->{name} eq 'fred');
 
-$u1->add_knows_key($k1);
-$u2->add_knows_key($k1);
-$u2->add_knows_key($k2);
+$u1->add_knows_key($k1, []);
+$u2->add_knows_key($k1, []);
+$u2->add_knows_key($k2, []);
 my @u1_known = $u1->get_known_keys();
 my @u2_known = $u2->get_known_keys();
 
