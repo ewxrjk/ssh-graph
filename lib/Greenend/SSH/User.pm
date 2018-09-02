@@ -84,7 +84,8 @@ In this section, B<$key> is always a L<Greenend::SSH::Key> object.
 
   $user->add_knows_key($key, \@privkey);
 
-Record that B<$user> knows the private half of B<$key>.
+Record that B<$user> knows the private half of B<$key>. The private
+key is supplied so that the protection may be critiqued.
 
 =cut
 
@@ -93,8 +94,7 @@ sub add_knows_key {
     my $key = shift;
     my $privkey = shift;
     $self->{known_keys}->{$key->get_id()} = 1;
-    $key->{known_by}->{$self->{name}} = 1;
-    # TODO do something with privkey
+    $key->add_known_by($self, $privkey);
     return $self;
 }
 

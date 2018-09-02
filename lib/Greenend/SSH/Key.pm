@@ -154,6 +154,23 @@ sub get_id($) {
     return $d->hexdigest();
 }
 
+=head2 add_known_by
+
+  $key->add_known_by($user, \@privkey);
+
+Record that this key is known to B<$user>. The private key is supplied
+so that the protection may be critiqued.
+
+=cut
+
+sub add_known_by {
+    my $self = shift;
+    my $user = shift;
+    my $privkey = shift;
+    $self->{known_by}->{$user->{name}} = 1;
+    # TODO do something with privkey
+}
+
 =head2 get_origins
 
   @origins = $key->get_origins();
