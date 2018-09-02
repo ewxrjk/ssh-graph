@@ -296,16 +296,16 @@ sub get_trouble {
     }
     my @weak_encryption_users = ();
     for my $username (sort keys %{$key->{private_key}}) {
-	my $privkey = $key->{private_key}->${username};
+	my $privkey = $key->{private_key}->{$username};
 	for my $line (@$privkey) {
-	    if($line =~ /dek-info:.*encrypted/i) {
+	    if($line =~ /proc-type:.*encrypted/i) {
 		push(@weak_encryption_users, $username);
 		last;
 	    }
 	}
     }
     if(scalar @weak_encryption_users > 0) {
-	push(@trouble, "Private key uses weak encryption the following users:",
+	push(@trouble, "Private key uses weak encryption for the following users:",
 	     map("  $_", @weak_encryption_users));
 	$key->{issues}->{weak_encryption} = \@weak_encryption_users;
     }

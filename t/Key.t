@@ -18,7 +18,8 @@
 use warnings;
 use strict;
 use Greenend::SSH::Key;
-use Test::Simple tests => 81;
+use Greenend::SSH::User;
+use Test::Simple tests => 83;
 
 # Protocol version 1 
 my $k1 = Greenend::SSH::Key->new
@@ -40,6 +41,13 @@ my $k2 = Greenend::SSH::Key->new
     ('origin' => 'this',
      'authorized_keys_line'
      => 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDc7qFIWeamHY4JgU/jfW9gzQpvE0iWnQApCcN2R+jr30XdAVDpyMyuL+YeAvikk23XlqYetBZIlIbUuXtbHzOJbjy5GQ/QxydkGbop6bvGcuChGQh96cJIl4M7Dev2fqP7LCaZlYV1h8aZrwNZHgjzs7JlLnu0qcUT5bkaVsrSKdX2VhwffVFadkK9TjbogJRvabrA1LlAELEOpzwy7BwcHejesARrmJWWqS8uwHjBmbgwIKCQQo7qI77SJ+FGMBJ+wQch7rC1gC1XZH+PMS6cKeEbsSJAC78dKiDuLTmKyN6k1SxflYPJjdyYCZ3Jiurb7iTqyILxDloUHYiGeeq3 rsa2048');
+$k2->add_known_by(Greenend::SSH::User->new(name=>"fred"),
+		  ["-----BEGIN RSA PRIVATE KEY-----",
+		   "Proc-Type: 4,ENCRYPTED",
+		   "DEK-Info: AES-128-CBC,F2C2CE5F5D4522562E9083E53E2A2450",
+		   "",
+		   "ypjjg...",
+		   "-----END RSA PRIVATE KEY-----"]);
 ok($k2->{type} eq "rsa", "type should be 'rsa', is '$k2->{type}'");
 ok($k2->{protocol} == 2, "protocol should be 2, is $k2->{protocol}");
 ok($k2->{name} eq "rsa2048", "name should be 'rsa2048', is '$k2->{name}'");
@@ -137,6 +145,8 @@ my @expect = ('Trouble with key 279226df0980a1acfe27683d317f7445',
               'Trouble with key d3d0c0b84efe325d0354d3c36000a198',
               '  Key has multiple names',
               '  Key is usable with protocol 1',
+	      '  Private key uses weak encryption for the following users:',
+	      '    fred',
               '  Names:',
               '    rsa2048',
               '    whatever',
@@ -153,6 +163,6 @@ my @expect = ('Trouble with key 279226df0980a1acfe27683d317f7445',
 
 ok(@critique == scalar @expect);
 for my $n (0..$#expect) {
-    ok($critique[$n] eq $expect[$n]);
+    ok($critique[$n] eq $expect[$n], sprintf("%2d: <%s> <%s>", $n, $critique[$n], $expect[$n]));
 }
 
