@@ -14,7 +14,7 @@ Installation
 To install, run the following commands:
 
     perl Makefile.PL
-    make
+    make test
     make install
 
 Documentation
