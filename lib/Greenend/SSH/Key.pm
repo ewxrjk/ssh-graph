@@ -87,6 +87,7 @@ sub initialize {
     $self->{origins} = {};
     $self->{issues} = {};
     $self->{revoked} = 0;
+    $self->{private_key} = {};
     while(@_ > 0) {
         my $key = shift;
         my $value = shift;
@@ -168,7 +169,7 @@ sub add_known_by {
     my $user = shift;
     my $privkey = shift;
     $self->{known_by}->{$user->{name}} = 1;
-    # TODO do something with privkey
+    $self->{private_key}->{$user->{name}} = $privkey;
 }
 
 =head2 get_origins
@@ -292,6 +293,21 @@ sub get_trouble {
     if($key->{strength} < $args{strength}) {
         push(@trouble, "$key->{type} $key->{bits} key is too weak");
         $key->{issues}->{weak} = $key->{strength};
+    }
+    my @weak_encryption_users = ();
+    for my $username (sort keys %{$key->{private_key}}) {
+	my $privkey = $key->{private_key}->${username};
+	for my $line (@$privkey) {
+	    if($line =~ /dek-info:.*encrypted/i) {
+		push(@weak_encryption_users, $username);
+		last;
+	    }
+	}
+    }
+    if(scalar @weak_encryption_users > 0) {
+	push(@trouble, "Private key uses weak encryption the following users:",
+	     map("  $_", @weak_encryption_users));
+	$key->{issues}->{weak_encryption} = \@weak_encryption_users;
     }
     return @trouble;
 }
@@ -457,6 +473,19 @@ also by some other key whose private half is known to the same user as
 knows the private half of B<$key>, then this is set.
 
 Note that this is only set by L<Greenend::SSH::User/critique>.
+
+=head3 weak_encryption
+
+  $key->{issues}->{weak_encryption} = [ $username, ... ]
+
+If B<$username> has a weakly encrypted copy of the privtae key then it
+is listed here.
+
+=head2 private_key
+
+  $key->{private_key}->{$username} = [ lines... ]
+
+Any copies found of the private key are listed here.
 
 =cut
 
