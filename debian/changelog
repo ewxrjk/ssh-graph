@@ -1,3 +1,10 @@
+ssh-graph (0.8) unstable; urgency=medium
+
+  * Change command separator character to ! (to work around filenames with
+    colons in).
+
+ -- Richard Kettlewell <rjk@terraraq.org.uk>  Fri, 30 Aug 2019 17:14:35 +0100
+
 ssh-graph (0.7) unstable; urgency=medium
 
   * More flexible --show option to control what is displayed

@@ -120,20 +120,20 @@ The simplest host syntax is just I<HOSTNAME> or
 I<USER>B<@>I<HOSTNAME>.  This is familiar from SSH.  The hostname must
 be recognizable to your local SSH client.
 
-If a colon appears in the host then a more complex syntax is used.
+If an exclamation mark appears in the host then a more complex syntax is used.
 The general form is:
 
-I<CMD>B<:>I<ARG1>B<:>...B<:>I<ARGn>B<:>I<DIR>B<:>I<HOSTNAME>
+I<CMD>B<!>I<ARG1>B<!>...B<!>I<ARGn>B<!>I<DIR>B<!>I<HOSTNAME>
 
 Here I<CMD> and I<ARG1> to I<ARGn> form the command to execute to
 reach the host; I<DIR> is the home directory to use; and I<HOSTNAME>
 is the name to give the host in the output.
 
-For example B<sudo:/root:root@local> means that B<sudo>(1) will be
+For example B<sudo!/root!root@local> means that B<sudo>(1) will be
 used to elevate privilege and the B<.ssh> directory in B</root> will
 be inspected, with the results reported as B<root@local>.
 
-A more complex example is B<sudo:ssh:-x:root@remote:/root:root@remote>
+A more complex example is B<sudo!ssh!-x!root@remote!/root!root@remote>
 which uses sudo locally to elevate privilege and then access a remote
 host via SSH.
 
@@ -230,7 +230,7 @@ B<ssh>(1), B<dot>(1)
 
 =cut
 
-our $VERSION = '0.7';
+our $VERSION = '0.8';
 
 our %command = ();      # command to access host
 
@@ -439,8 +439,8 @@ if($local) {
 ## Read remote keys and configuration
 
 for my $host (@ARGV) {
-    if($host =~ /:/) {
-        my @hostbits = split(/:/, $host);
+    if($host =~ /!/) {
+        my @hostbits = split(/!/, $host);
         $host = pop @hostbits;
         my $dir = pop @hostbits;
         $command{$host} = sub {
